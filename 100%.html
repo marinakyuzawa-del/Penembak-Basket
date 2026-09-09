@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Penembak Basket Simulator</title>
+<style>
+  :root{
+    --court-line:#f4e3c1;
+    --ink:#1c140d;
+    --paper:#fff8ec;
+    --panel:#241b12;
+    --panel-2:#33261a;
+    --accent:#ff7a1a;
+    --accent-2:#ffb648;
+    --good:#3ecf6a;
+    --bad:#ff5b5b;
+    --gold:#ffd25c;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;height:100%;
+    background:#0d0906;
+    font-family:'Trebuchet MS','Segoe UI',sans-serif;
+    color:var(--paper);
+    overflow:hidden;
+    -webkit-user-select:none;user-select:none;
+  }
+  #app{
+    position:relative;
+    width:100vw;height:100vh;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #stage{
+    position:relative;
+    width:min(100vw,177.7vh);
+    height:min(56.25vw,100vh);
+    background:#000;
+    overflow:hidden;
+    box-shadow:0 0 60px rgba(0,0,0,.6) inset;
+  }
+  #game{
+    position:absolute;top:0;left:0;
+    width:100%;height:100%;
+    display:block;
+    touch-action:none;
+  }
+
+  /* ---------- Top HUD ---------- */
+  .hud-top{
+    position:absolute;top:14px;left:14px;right:14px;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    pointer-events:none;
+    z-index:5;
+  }
+  .pill{
+    pointer-events:auto;
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:999px;
+    padding:8px 16px;
+    display:flex;align-items:center;gap:8px;
+    font-size:15px;font-weight:700;
+    box-shadow:0 4px 10px rgba(0,0,0,.4);
+  }
+  .pill .dot{width:16px;height:16px;border-radius:50%;flex:none;}
+  .coin-dot{background:radial-gradient(circle at 35% 30%,#fff4c8,var(--gold) 60%,#b8860b);}
+  .wallet-icon{font-size:16px;line-height:1;cursor:pointer;}
+  .wallet-icon:active{transform:scale(.9);}
+  /* target zone marker on power bar */
+  .power-target{position:absolute;top:0;bottom:0;background:rgba(255,255,255,.35);border-left:2px solid #fff;border-right:2px solid #fff;pointer-events:none;}
+  .power-arrow{position:absolute;top:-9px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fff;transform:translateX(-50%);pointer-events:none;}
+  /* transfer modal */
+  .transfer-box{display:flex;flex-direction:column;gap:10px;}
+  /* center notification */
+  #centerNotif{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:60;pointer-events:none;}
+  #centerNotif.show{display:flex;}
+  #centerNotif .cn-card{background:linear-gradient(180deg,#241b12,#180f09);border:2px solid var(--gold);border-radius:18px;padding:22px 28px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6);animation:cnpop .25s ease;}
+  @keyframes cnpop{from{transform:scale(.7);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .cn-card .cn-title{font-size:14px;opacity:.8;margin-bottom:6px;}
+  .cn-card .cn-amt{font-size:26px;font-weight:800;color:var(--gold);margin-bottom:4px;}
+  .cn-card .cn-from{font-size:14px;opacity:.9;}
+  /* gacha reel */
+  .reel-wrap{position:relative;width:min(520px,92vw);height:110px;background:#0e0906;border:2px solid rgba(255,255,255,.15);border-radius:14px;overflow:hidden;margin-bottom:6px;}
+  .reel-track{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;will-change:transform;}
+  .reel-item{width:96px;height:96px;flex:none;display:flex;align-items:center;justify-content:center;margin:0 6px;background:#1b130c;border-radius:12px;border:2px solid rgba(255,255,255,.08);}
+  .reel-item canvas{width:74px;height:74px;}
+  .reel-item.hidden-pick{filter:brightness(0) saturate(0);opacity:.5;}
+  .reel-pointer{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:14px solid var(--gold);z-index:2;}
+  .reel-pointer.bottom{top:auto;bottom:-6px;border-top:none;border-bottom:14px solid var(--gold);}
+  .reel-center-mark{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(255,255,255,.5);transform:translateX(-50%);}
+  .score-line{font-size:13px;font-weight:400;opacity:.75;margin-left:4px;}
+
+  .top-actions{
+    pointer-events:auto;
+    display:flex;gap:8px;
+  }
+  .icon-btn{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid rgba(255,255,255,.1);
+    color:var(--paper);
+    border-radius:12px;
+    padding:8px 14px;
+    font-size:14px;font-weight:700;
+    cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,.4);
+    transition:transform .12s ease, background .12s ease;
+  }
+  .icon-btn:hover{background:linear-gradient(180deg,#3d2c1c,#2a1f14);transform:translateY(-1px);}
+  .icon-btn:active{transform:translateY(0px) scale(.97);}
+
+  /* ---------- Bottom HUD (power meter + redeem) ---------- */
+  .hud-bottom{
+    position:absolute;left:0;right:0;bottom:0;
+    display:flex;flex-direction:column;align-items:center;
+    gap:8px;
+    padding:0 14px 16px;
+    pointer-events:none;
+    z-index:5;
+  }
+  .hint{
+    font-size:12.5px;
+    opacity:.8;
+    background:rgba(10,7,4,.55);
+    padding:4px 12px;border-radius:999px;
+    pointer-events:none;
+  }
+  .power-wrap{
+    pointer-events:auto;
+    width:min(420px,72%);
+    background:rgba(10,7,4,.55);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    padding:8px 10px;
+  }
+  .power-track{
+    position:relative;
+    width:100%;height:16px;
+    border-radius:999px;
+    background:#140d08;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);
+  }
+  .power-fill{
+    position:absolute;left:0;top:0;bottom:0;
+    width:0%;
+    border-radius:999px;
+    background:linear-gradient(90deg,var(--good),var(--gold) 55%,var(--bad) 90%);
+    transition:width .03s linear;
+  }
+
+  .redeem-row{
+    pointer-events:auto;
+    position:absolute;
+    left:14px;bottom:16px;
+    display:flex;gap:6px;
+    z-index:6;
+  }
+  .redeem-row input{
+    width:160px;
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,.15);
+    color:var(--paper);
+    border-radius:10px;
+    padding:8px 10px;
+    font-size:13px;
+    outline:none;
+  }
+  .redeem-row input:focus{border-color:var(--accent-2);}
+  .redeem-row button{
+    background:linear-gradient(180deg,var(--accent-2),var(--accent));
+    border:none;color:#241205;font-weight:800;
+    border-radius:10px;padding:8px 14px;font-size:13px;
+    cursor:pointer;
+  }
+  .redeem-row button:active{transform:scale(.96);}
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:absolute;top:70px;left:50%;transform:translateX(-50%);
+    background:rgba(15,10,6,.92);
+    border:1px solid rgba(255,255,255,.15);
+    padding:10px 18px;border-radius:12px;
+    font-size:14px;font-weight:700;
+    opacity:0;pointer-events:none;
+    transition:opacity .25s ease, top .25s ease;
+    z-index:20;
+    max-width:80%;text-align:center;
+  }
+  #toast.show{opacity:1;top:82px;}
+
+  /* ---------- Modal ---------- */
+  .modal-back{
+    position:absolute;inset:0;
+    background:rgba(6,4,2,.72);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:30;
+  }
+  .modal-back.open{display:flex;}
+  .modal{
+    width:min(560px,88%);
+    max-height:82%;
+    overflow-y:auto;
+    background:linear-gradient(180deg,#221810,#180f09);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:18px;
+    padding:18px 18px 22px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);
+  }
+  .modal h2{margin:0 0 4px;font-size:19px;}
+  .modal .sub{font-size:12.5px;opacity:.7;margin-bottom:14px;}
+  .modal-close{
+    float:right;
+    background:none;border:none;color:var(--paper);
+    font-size:18px;cursor:pointer;opacity:.7;
+  }
+  .modal-close:hover{opacity:1;}
+
+  .gacha-cta{
+    display:flex;align-items:center;justify-content:space-between;
+    background:rgba(255,122,26,.08);
+    border:1px solid rgba(255,122,26,.35);
+    border-radius:14px;
+    padding:14px;margin-bottom:16px;
+  }
+  .gacha-cta button{
+    background:linear-gradient(180deg,var(--accent-2),var(--accent));
+    border:none;color:#241205;font-weight:800;
+    border-radius:10px;padding:10px 18px;font-size:14px;cursor:pointer;
+  }
+  .gacha-cta button:disabled{opacity:.4;cursor:not-allowed;}
+
+  .skin-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+  }
+  .skin-card{
+    position:relative;
+    background:#140d08;
+    border:2px solid rgba(255,255,255,.08);
+    border-radius:14px;
+    padding:10px 6px 8px;
+    text-align:center;
+    cursor:pointer;
+  }
+  .skin-card canvas{width:64px;height:64px;}
+  .skin-card .name{font-size:11.5px;font-weight:700;margin-top:2px;}
+  .skin-card .rarity{font-size:10px;opacity:.7;text-transform:capitalize;}
+  .skin-card.selected{border-color:var(--accent-2);box-shadow:0 0 0 2px rgba(255,182,72,.3) inset;}
+  .skin-card.locked{opacity:.4;cursor:not-allowed;filter:grayscale(1);}
+  .skin-card .lock{
+    position:absolute;top:6px;right:8px;font-size:13px;
+  }
+
+  #reveal{
+    position:absolute;inset:0;
+    display:none;align-items:center;justify-content:center;
+    background:rgba(4,3,2,.85);
+    z-index:40;flex-direction:column;gap:12px;
+  }
+  #reveal.open{display:flex;}
+  #reveal canvas{width:130px;height:130px;}
+  #reveal .r-name{font-size:20px;font-weight:800;}
+  #reveal .r-rar{font-size:13px;opacity:.8;text-transform:uppercase;letter-spacing:1px;}
+  #reveal button{
+    margin-top:8px;
+    background:linear-gradient(180deg,var(--accent-2),var(--accent));
+    border:none;color:#241205;font-weight:800;
+    border-radius:10px;padding:9px 20px;font-size:14px;cursor:pointer;
+  }
+  #revealBody{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:90%;}
+  .reveal-grid{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
+    max-width:min(500px,86vw);
+  }
+  .reveal-grid .g-item{
+    background:#140d08;border:2px solid rgba(255,255,255,.1);border-radius:12px;
+    padding:6px 4px;text-align:center;
+  }
+  .reveal-grid .g-item canvas{width:44px;height:44px;}
+  .reveal-grid .g-item .g-name{font-size:9.5px;font-weight:700;margin-top:2px;}
+  .reveal-grid .g-item.g-dupe{opacity:.65;}
+
+  .icon-btn.active{
+    background:linear-gradient(180deg,var(--good),#278a48);
+    color:#062910;
+  }
+
+  .board-row{
+    display:flex;justify-content:space-between;align-items:center;
+    background:#140d08;border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;padding:8px 12px;font-size:13.5px;
+  }
+  .board-row.me{border-color:var(--accent-2);background:rgba(255,182,72,.08);}
+  .board-row .b-rank{opacity:.6;width:28px;flex:none;font-weight:700;text-align:center;}
+  .board-row .b-name{flex:1;text-align:left;padding-left:6px;font-weight:700;}
+  .board-row .b-coin{color:var(--gold);font-weight:800;}
+
+  .auth-tab{font-weight:700;font-size:13px;}
+  .auth-tab.active{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#241205;}
+  .auth-input{
+    display:block;width:80%;margin:0 auto 10px;
+    background:var(--panel);border:1px solid rgba(255,255,255,.15);
+    color:var(--paper);border-radius:10px;padding:10px 12px;
+    font-size:14px;outline:none;text-align:center;
+  }
+  .auth-input:focus{border-color:var(--accent-2);}
+  .auth-submit{
+    background:linear-gradient(180deg,var(--accent-2),var(--accent));
+    border:none;color:#241205;font-weight:800;
+    border-radius:10px;padding:10px 24px;font-size:14px;cursor:pointer;
+  }
+
+  .admin-row{
+    background:#140d08;border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;padding:8px 12px;font-size:12.5px;
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .admin-row .a-top{display:flex;justify-content:space-between;font-weight:700;}
+  .admin-row .a-meta{opacity:.65;}
+
+  /* duel two-side hand POV indicator */
+  .duel-hands{position:absolute;left:0;right:0;top:70px;display:none;justify-content:space-between;padding:0 22px;pointer-events:none;z-index:4;}
+  .duel-hands.show{display:flex;}
+  .hand-box{text-align:center;background:rgba(10,7,4,.55);border-radius:12px;padding:6px 12px;transition:opacity .25s ease, transform .25s ease;opacity:.35;transform:scale(.92);}
+  .hand-box.active{opacity:1;transform:scale(1.05);box-shadow:0 0 0 2px var(--gold);}
+  .hand-box .hb-emoji{font-size:30px;line-height:1;}
+  .hand-box .hb-label{font-size:10.5px;font-weight:700;margin-top:2px;}
+
+  .duel-scoreboard{pointer-events:auto;text-align:center;background:rgba(10,7,4,.72);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:8px 16px;min-width:170px;align-self:flex-start;}
+  .duel-scoreboard .ds-row{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;font-size:12px;white-space:nowrap;}
+  .duel-scoreboard .ds-score{font-size:19px;color:var(--gold);letter-spacing:1px;}
+  .duel-scoreboard .ds-turn{font-size:11px;opacity:.85;margin-top:3px;}
+  .duel-scoreboard .ds-cancel{margin-top:6px;background:linear-gradient(180deg,var(--bad),#8a1f1f);border:none;color:#fff;font-weight:800;border-radius:8px;padding:4px 12px;font-size:10.5px;cursor:pointer;}
+  .duel-turn-banner{position:absolute;left:50%;top:100px;transform:translateX(-50%);background:rgba(10,7,4,.75);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 18px;font-weight:800;font-size:13px;display:none;pointer-events:none;z-index:4;}
+  .duel-turn-banner.show{display:block;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <div class="hud-top">
+      <div style="display:flex;gap:8px;">
+        <div class="pill"><span class="wallet-icon" id="walletIcon" title="Transfer uang">💰</span><span id="coinLabel">Rp 0</span><span id="crownBadge" style="display:none;margin-left:2px;" title="Owner">👑</span></div>
+        <div class="pill" style="font-weight:400;font-size:13px;">Masuk: <b id="madeLabel" style="margin:0 4px;">0</b> / <span id="attemptLabel">0</span></div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="btnBoard">🏆 Skor</button>
+        <button class="icon-btn" id="btnDuel">⚔️ Duel</button>
+        <button class="icon-btn" id="btnSkin">🏀 Skin</button>
+        <button class="icon-btn" id="btnGacha">🎁 Gacha</button>
+        <button class="icon-btn" id="btnTheme">🎨 Tema</button>
+        <button class="icon-btn" id="btnAdmin" style="display:none;">🛡️ Admin</button>
+      </div>
+    </div>
+
+    <div class="duel-hands" id="duelHandsOverlay">
+      <div class="hand-box" id="oppHandBox"><div class="hb-emoji" style="transform:scaleX(-1);">🤚🏀</div><div class="hb-label" id="oppHandLabel">Tangan Lawan</div></div>
+      <div class="duel-scoreboard" id="duelScoreboard">
+        <div class="ds-row"><span id="dsOppName">Lawan</span><span class="ds-score" id="dsScore">00 - 00</span><span id="dsMeName">Kamu</span></div>
+        <div class="ds-turn" id="dsTurnText">Giliranmu — lempar sekarang!</div>
+        <button class="ds-cancel" id="btnDuelQuickCancel">✕ Batalkan Duel</button>
+      </div>
+      <div class="hand-box" id="myHandBox"><div class="hb-emoji">🏀🤚</div><div class="hb-label">Tanganmu (POV kamu)</div></div>
+    </div>
+    <div class="duel-turn-banner" id="duelTurnBanner">Giliran Lawan…</div>
+
+    <div class="redeem-row">
+      <input id="codeInput" type="text" placeholder="Masukkan kode" maxlength="40" autocomplete="off">
+      <button id="btnRedeem">Redeem</button>
+    </div>
+    <div class="hint" id="redeemHint" style="position:absolute;left:14px;bottom:56px;opacity:.65;pointer-events:none;max-width:min(320px,60vw);line-height:1.5;">Kode aktif:<br>• NEWBIE / PEMULA → +Rp 300 pemula<br>• BOLA → Bola Api gratis (bonus koin x5)</div>
+
+    <div class="hud-bottom">
+      <div class="hint" id="hintText">Tahan (klik / tekan Spasi) untuk isi power, lepas untuk melempar</div>
+      <div class="power-wrap">
+        <div class="power-track">
+          <div class="power-fill" id="powerFill"></div>
+          <div class="power-target" id="powerTarget"></div>
+          <div class="power-arrow" id="powerArrow"></div>
+        </div>
+        <div class="hint" style="opacity:.6;padding:2px 0 0;background:none;">Lepas tepat di area putih untuk MASUK</div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+    <div id="centerNotif"><div class="cn-card">
+      <div class="cn-title">💸 Transfer Masuk</div>
+      <div class="cn-amt" id="cnAmt">Rp 0</div>
+      <div class="cn-from" id="cnFrom">dari -</div>
+    </div></div>
+
+    <!-- Skin modal -->
+    <div class="modal-back" id="skinModal">
+      <div class="modal">
+        <button class="modal-close" data-close="skinModal">✕</button>
+        <h2>Koleksi Skin Bola</h2>
+        <div class="sub">Pilih skin yang sudah kamu miliki untuk dipakai bermain.</div>
+        <div class="skin-grid" id="skinGrid"></div>
+      </div>
+    </div>
+
+    <!-- Gacha modal -->
+    <div class="modal-back" id="gachaModal">
+      <div class="modal">
+        <button class="modal-close" data-close="gachaModal">✕</button>
+        <h2>Gacha Skin Bola</h2>
+        <div class="sub">Gunakan uang hasil memasukkan bola untuk membuka skin baru.</div>
+        <div class="gacha-cta">
+          <div>
+            <div style="font-weight:800;">1x Gacha</div>
+            <div style="font-size:12px;opacity:.75;">Biaya: Rp 100</div>
+          </div>
+          <button id="btnRoll">Buka</button>
+        </div>
+        <div class="gacha-cta">
+          <div>
+            <div style="font-weight:800;">10x Gacha</div>
+            <div style="font-size:12px;opacity:.75;">Biaya: Rp 900 (hemat Rp 100)</div>
+          </div>
+          <button id="btnRoll10">Buka x10</button>
+        </div>
+        <div class="gacha-cta">
+          <div>
+            <div style="font-weight:800;">Auto Spin</div>
+            <div style="font-size:12px;opacity:.75;">Terus gacha 1x otomatis sampai uang habis atau dihentikan</div>
+          </div>
+          <button id="btnAutoSpin">Mulai Auto</button>
+        </div>
+        <div class="sub" style="margin-bottom:8px;">Semua skin (semakin tinggi rarity, semakin kecil peluangnya):</div>
+        <div class="skin-grid" id="gachaPreviewGrid"></div>
+      </div>
+    </div>
+
+    <!-- Leaderboard modal -->
+    <div class="modal-back" id="boardModal">
+      <div class="modal">
+        <button class="modal-close" data-close="boardModal">✕</button>
+        <h2>Papan Skor Bersama</h2>
+        <div id="boardOnlineBadge" style="display:inline-flex;align-items:center;gap:6px;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.5);color:#5cf29a;font-weight:800;font-size:12px;border-radius:999px;padding:4px 12px;margin-bottom:10px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#4be07a;box-shadow:0 0 6px #4be07a;display:inline-block;"></span>
+          ONLINE — data server bersama, live untuk semua pemain
+        </div>
+        <div class="sub">Terlihat oleh semua orang yang membuka game ini — main bareng, adu saldo!</div>
+        <div id="boardList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+
+    <!-- Transfer modal -->
+    <div class="modal-back" id="transferModal">
+      <div class="modal">
+        <button class="modal-close" data-close="transferModal">✕</button>
+        <h2>💰 Transfer Uang</h2>
+        <div class="sub">Kirim saldo ke pemain lain (harus akun terdaftar, bukan tamu).</div>
+        <div class="transfer-box">
+          <input id="transferTarget" type="text" placeholder="Username tujuan" maxlength="16" autocomplete="off" class="auth-input" style="width:100%;">
+          <input id="transferAmount" type="number" min="1" placeholder="Masukan Nominal" class="auth-input" style="width:100%;">
+          <button id="btnSendTransfer" class="auth-submit">Kirim</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Owner admin panel -->
+    <div class="modal-back" id="adminModal">
+      <div class="modal">
+        <button class="modal-close" data-close="adminModal">✕</button>
+        <h2>🛡️ Panel Owner</h2>
+        <div id="adminOnlineBadge" style="display:inline-flex;align-items:center;gap:6px;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.5);color:#5cf29a;font-weight:800;font-size:12px;border-radius:999px;padding:4px 12px;margin-bottom:10px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#4be07a;box-shadow:0 0 6px #4be07a;display:inline-block;"></span>
+          ONLINE — akun tersimpan di server bersama, siap dimainkan teman
+        </div>
+        <div class="sub">Daftar akun yang terdaftar di game ini. Email disensor. Password tidak pernah ditampilkan — gunakan tombol Reset Password untuk bantu user yang kehilangan akun (data koin/skin tetap aman).</div>
+        <div id="adminList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+
+    <!-- Reset password modal (replaces unreliable native prompt()) -->
+    <div class="modal-back" id="resetPassModal">
+      <div class="modal" style="text-align:center;">
+        <button class="modal-close" data-close="resetPassModal">✕</button>
+        <h2>🔑 Reset Password</h2>
+        <div class="sub">Password baru untuk <b id="resetPassUserLabel">-</b>. Data koin & skin user tidak akan hilang.</div>
+        <input id="resetPassInput" type="password" placeholder="Password baru (min. 4 karakter)" maxlength="40" autocomplete="off" class="auth-input">
+        <button id="btnResetPassConfirm" class="auth-submit">Simpan Password Baru</button>
+      </div>
+    </div>
+
+    <!-- Duel modal -->
+    <div class="modal-back" id="duelModal">
+      <div class="modal">
+        <button class="modal-close" data-close="duelModal">✕</button>
+        <h2>⚔️ Duel Pemain</h2>
+        <div class="sub" id="duelSub">Lempar bergiliran melawan pemain lain. Siapa lebih dulu mencapai skor 12 menang Rp 10.000 (lawan bot: Rp 3.000).</div>
+        <div id="duelLobby">
+          <div class="gacha-cta">
+            <div>
+              <div style="font-weight:800;">Lawan Bot</div>
+              <div style="font-size:12px;opacity:.75;">Latihan instan lawan bot — kekuatannya seimbang, tidak internet</div>
+            </div>
+            <button id="btnFightBot">Mulai</button>
+          </div>
+          <div class="gacha-cta">
+            <div>
+              <div style="font-weight:800;">Cari Lawan</div>
+              <div style="font-size:12px;opacity:.75;">Dicocokkan otomatis dengan pemain lain yang sedang mencari</div>
+            </div>
+            <button id="btnFindOpponent">Cari</button>
+          </div>
+          <div class="gacha-cta">
+            <div>
+              <div style="font-weight:800;">Buat Room</div>
+              <div style="font-size:12px;opacity:.75;">Dapat kode 5 digit untuk dibagikan ke temanmu</div>
+            </div>
+            <button id="btnCreateRoom">Buat</button>
+          </div>
+          <div class="gacha-cta">
+            <div style="flex:1;">
+              <div style="font-weight:800;margin-bottom:6px;">Gabung dengan Kode</div>
+              <input id="roomCodeInput" type="text" placeholder="Kode 5 digit" maxlength="5" inputmode="numeric"
+                style="width:100px;background:var(--panel);border:1px solid rgba(255,255,255,.15);color:var(--paper);border-radius:8px;padding:7px 10px;font-size:14px;outline:none;letter-spacing:2px;">
+            </div>
+            <button id="btnJoinRoom">Gabung</button>
+          </div>
+        </div>
+        <div id="duelActive" style="display:none;">
+          <div id="duelStatusBox" style="text-align:center;background:#140d08;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:13px;opacity:.7;">Kode Room</div>
+            <div id="duelCodeDisplay" style="font-size:26px;font-weight:800;letter-spacing:4px;margin:4px 0;">-----</div>
+            <div id="duelStateText" style="font-size:13.5px;">Menunggu lawan…</div>
+          </div>
+          <div style="display:flex;justify-content:space-around;text-align:center;margin-bottom:14px;">
+            <div>
+              <div style="font-size:12px;opacity:.7;">Kamu</div>
+              <div id="duelMyName" style="font-weight:800;">-</div>
+              <div id="duelMyShots" style="font-size:20px;margin-top:4px;font-weight:800;">0 / 12</div>
+              <div id="duelMyTrail" style="font-size:12px;opacity:.6;margin-top:2px;letter-spacing:1px;">-</div>
+            </div>
+            <div>
+              <div style="font-size:12px;opacity:.7;">Lawan</div>
+              <div id="duelOppName" style="font-weight:800;">-</div>
+              <div id="duelOppShots" style="font-size:20px;margin-top:4px;font-weight:800;">0 / 12</div>
+              <div id="duelOppTrail" style="font-size:12px;opacity:.6;margin-top:2px;letter-spacing:1px;">-</div>
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <button id="btnCancelDuel" style="background:linear-gradient(180deg,var(--bad),#8a1f1f);border:none;color:#fff;font-weight:800;border-radius:10px;padding:9px 20px;font-size:14px;cursor:pointer;">Batalkan Duel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth overlay: guest / login / register -->
+    <div class="modal-back open" id="authModal" style="z-index:50;">
+      <div class="modal" style="text-align:center;">
+        <h2>Penembak Basket Simulator</h2>
+        <div class="sub">Buat akun untuk menyimpan progres & main bareng pemain lain, atau langsung main sebagai tamu.</div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-bottom:14px;">
+          <button class="icon-btn auth-tab active" data-tab="guest">Tamu</button>
+          <button class="icon-btn auth-tab" data-tab="login">Masuk</button>
+          <button class="icon-btn auth-tab" data-tab="register">Daftar</button>
+        </div>
+
+        <div class="auth-pane" id="authPaneGuest">
+          <input id="joinNameInput" type="text" placeholder="Nama tamu" maxlength="16" autocomplete="off" class="auth-input">
+          <button id="btnJoin" class="auth-submit">Mulai Main</button>
+          <div class="sub" style="margin-top:8px;">Progres tamu tidak bisa dipakai login lagi nanti.</div>
+        </div>
+
+        <div class="auth-pane" id="authPaneLogin" style="display:none;">
+          <input id="loginUser" type="text" placeholder="Username" maxlength="16" autocomplete="off" class="auth-input">
+          <input id="loginPass" type="password" placeholder="Password" maxlength="40" autocomplete="off" class="auth-input">
+          <button id="btnLogin" class="auth-submit">Masuk</button>
+        </div>
+
+        <div class="auth-pane" id="authPaneRegister" style="display:none;">
+          <input id="regUser" type="text" placeholder="Username" maxlength="16" autocomplete="off" class="auth-input">
+          <input id="regPass" type="password" placeholder="Password" maxlength="40" autocomplete="off" class="auth-input">
+          <input id="regEmail" type="text" placeholder="Email (opsional)" maxlength="60" autocomplete="off" class="auth-input">
+          <button id="btnRegister" class="auth-submit">Daftar & Main</button>
+          <div class="sub" style="margin-top:8px;">Data akun disimpan di penyimpanan bersama game ini — jangan pakai password yang sama dengan akun pentingmu.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reveal overlay -->
+    <div id="reveal">
+      <div id="revealBody"></div>
+      <button id="revealClose">Oke</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ CONFIG ============ */
+const OWNER_CODE = "OWNERONLY";
+const W = 960, H = 540; // logical resolution
+const GROUND_Y = 470;
+const HOOP_X = 480, RIM_Y = 168, RIM_RX = 46, RIM_RY = 9;
+const BOARD_TOP = 78, BOARD_BOTTOM = 172, BOARD_CX = 480, BOARD_HALF_W = 62;
+const HAND_X = 480, HAND_Y = 460;
+
+const RARITY_MULT = { common:1, rare:1.5, epic:3, legendary:8, secret:20 };
+
+const SKINS = [
+  {id:'classic', name:'Klasik', rarity:'common', weight:26, base:'#e07a29', seam:'#241408', pattern:'classic'},
+  {id:'street',  name:'Jalanan Biru', rarity:'common', weight:20, base:'#2b7fd9', seam:'#0a2035', pattern:'classic'},
+  {id:'neon',    name:'Neon Hijau', rarity:'common', weight:20, base:'#3bd671', seam:'#08301a', pattern:'stripe'},
+  {id:'sunset',  name:'Sunset Merah', rarity:'common', weight:14, base:'#e2412f', seam:'#3a0a06', pattern:'classic'},
+  {id:'carbon',  name:'Carbon Fiber', rarity:'rare', weight:9, base:'#2b2b2f', seam:'#000', pattern:'carbon'},
+  {id:'galaxy',  name:'Galaxy Ungu', rarity:'rare', weight:6, base:'#5a2b9e', seam:'#160a2b', pattern:'galaxy'},
+  {id:'ice',     name:'Kristal Es', rarity:'rare', weight:7, base:'#8fe3ff', seam:'#0d3a4a', pattern:'ice'},
+  {id:'toxic',   name:'Bola Racun', rarity:'rare', weight:6, base:'#6ee62f', seam:'#0c3a06', pattern:'toxic'},
+  {id:'gold',    name:'Gold Deluxe', rarity:'epic', weight:3, base:'#e8b23a', seam:'#5c3d05', pattern:'gold'},
+  {id:'thunder', name:'Bola Petir', rarity:'epic', weight:2.5, base:'#3a6bff', seam:'#0a1440', pattern:'thunder'},
+  {id:'sakura',  name:'Bola Sakura', rarity:'epic', weight:2.2, base:'#ff9ecb', seam:'#5c1236', pattern:'sakura'},
+  {id:'rainbow', name:'Bola Rainbow RGB', rarity:'legendary', weight:0.3, base:'#ff5ecb', seam:'#2a0620', pattern:'rainbow'},
+  {id:'diamond', name:'Bola Berlian', rarity:'legendary', weight:0.25, base:'#dff4ff', seam:'#274a5c', pattern:'diamond'},
+  {id:'dragon',  name:'Bola Naga', rarity:'secret', weight:0.1, base:'#a64dff', seam:'#1c0d24', pattern:'dragon'},
+  {id:'eclipse', name:'Eclipse Ball', rarity:'secret', weight:0.1, base:'#0a0a0c', seam:'#000000', pattern:'eclipse'},
+  {id:'cosmicring', name:'Bola Galaksi Cincin', rarity:'secret', weight:0.05, base:'#241a52', seam:'#0a0620', pattern:'cosmicring'},
+  {id:'fireball',name:'Bola Api', rarity:'event', weight:0, base:'#ff6a1a', seam:'#3a0e00', pattern:'inferno', multiplier:5, redeemOnly:true}
+];
+const SKIN_MAP = Object.fromEntries(SKINS.map(s=>[s.id,s]));
+
+/* ============ STATE ============ */
+let coins = 60;
+let made = 0, attempts = 0;
+let owned = new Set(['classic']);
+let activeSkin = 'classic';
+
+let phase = 'idle'; // idle | charging | flight | bounce
+let power = 0;
+let chargeStart = 0;
+const CYCLE_MS = 1300; // full up-down cycle
+
+/* Target zone: random each attempt, shown as a marked band on the power bar.
+   Landing the release inside the band is what makes the shot go in — not pure luck,
+   the player can see exactly where they need to stop. */
+const TARGET_WIDTH = 16; // width of the required window, in power points (0-100)
+let targetMin = 64, targetMax = 80;
+function rollNewTarget(){
+  targetMin = Math.round(10 + Math.random()*(90-TARGET_WIDTH-10));
+  targetMax = targetMin + TARGET_WIDTH;
+  const trackEl = document.getElementById('powerTarget');
+  const arrowEl = document.getElementById('powerArrow');
+  if(trackEl){ trackEl.style.left = targetMin+'%'; trackEl.style.width = (targetMax-targetMin)+'%'; }
+  if(arrowEl){ arrowEl.style.left = ((targetMin+targetMax)/2)+'%'; }
+}
+
+let ball = { x:HAND_X, y:HAND_Y, r:32, rot:0 };
+let armPullAtRelease = 0;
+let shotOwner = 'player'; // 'player' | 'opponent' — which side's shot is currently animating
+let flightT = 0, flightDur = 0;
+let flightFrom = null, flightPeak = 0, flightIsMake = false, flightHitX=0, flightHitY=0, flightApproachAngle=0;
+let bounceVel = {x:0,y:0}, bounceLife = 0;
+let netSwing = 0;
+let armPose = 'idle'; // idle | charge | throw
+let armThrowT = 0;
+let particles = [];
+let floaters = [];
+
+/* ============ CANVAS SETUP ============ */
+const canvas = document.getElementById('game');
+let ctx = canvas.getContext('2d');
+function resize(){
+  const stage = document.getElementById('stage');
+  const rect = stage.getBoundingClientRect();
+  canvas.width = W; canvas.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ============ UI REFS ============ */
+const coinLabel = document.getElementById('coinLabel');
+const madeLabel = document.getElementById('madeLabel');
+const attemptLabel = document.getElementById('attemptLabel');
+const powerFill = document.getElementById('powerFill');
+const hintText = document.getElementById('hintText');
+const toastEl = document.getElementById('toast');
+
+function updateHUD(){
+  coinLabel.textContent = 'Rp '+coins.toLocaleString('id-ID');
+  madeLabel.textContent = made;
+  attemptLabel.textContent = attempts;
+  syncAccount();
+}
+updateHUD();
+rollNewTarget();
+
+let toastTimer = null;
+function toast(msg, ms=2200){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
+
+/* ============ INPUT ============ */
+function tryStartCharge(){
+  if(phase!=='idle') return;
+  if(duel.active && duel.status==='active' && duel.turn!==duel.role){
+    toast('Tunggu giliranmu di duel!', 1200);
+    return;
+  }
+  phase='charging';
+  chargeStart = performance.now();
+  armPose='charge';
+  rollNewTarget();
+  hintText.textContent = 'Lepas untuk melempar!';
+}
+function releaseCharge(){
+  if(phase!=='charging') return;
+  launchBall(power);
+}
+const stage = document.getElementById('stage');
+stage.addEventListener('mousedown', (e)=>{
+  if(e.target.closest('.redeem-row')||e.target.closest('.hud-top')||e.target.closest('.modal-back')) return;
+  tryStartCharge();
+});
+window.addEventListener('mouseup', releaseCharge);
+stage.addEventListener('touchstart', (e)=>{
+  if(e.target.closest('.redeem-row')||e.target.closest('.hud-top')||e.target.closest('.modal-back')) return;
+  tryStartCharge();
+}, {passive:true});
+window.addEventListener('touchend', releaseCharge);
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='Space' && document.activeElement && document.activeElement.tagName!=='INPUT'){
+    e.preventDefault();
+    tryStartCharge();
+  }
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.code==='Space') releaseCharge();
+});
+
+/* ============ GAME LOGIC ============ */
+function launchBall(p){
+  if(shotOwner==='player') attempts++;
+  const sweetMin=targetMin, sweetMax=targetMax;
+  flightIsMake = (p>=sweetMin && p<=sweetMax);
+  flightFrom = {x:HAND_X, y:HAND_Y};
+
+  if(flightIsMake){
+    flightPeak = 150 + (p-sweetMin)/(sweetMax-sweetMin)*40;
+    flightHitX = HOOP_X; flightHitY = RIM_Y;
+  } else if(p < sweetMin){
+    // too weak -> falls short, hits front rim / floor before hoop
+    const t = Math.max(0,p)/sweetMin;
+    flightPeak = 70 + t*90;
+    flightHitX = HAND_X + (HOOP_X-HAND_X) * (0.55 + 0.3*t);
+    flightHitY = RIM_Y + (1-t)*70;
+  } else {
+    // too strong -> overshoots, clanks off backboard
+    const t = Math.min(1,(p-sweetMax)/(100-sweetMax));
+    flightPeak = 190 + t*50;
+    flightHitX = HOOP_X + 4;
+    flightHitY = BOARD_TOP + 20 - t*10;
+  }
+
+  flightT = 0;
+  flightDur = 62; // frames
+  phase='flight';
+  armPullAtRelease = p/100;
+  armPose='throw'; armThrowT=0;
+  hintText.textContent = '';
+}
+
+function resolveShot(){
+  const owner = shotOwner;
+  if(flightIsMake){
+    if(owner==='player'){
+      made++;
+      const base = 10 + Math.floor(Math.random()*6); // 10-15
+      const activeSkinDef = SKIN_MAP[activeSkin]||SKIN_MAP.classic;
+      const mult = activeSkinDef.multiplier || RARITY_MULT[activeSkinDef.rarity] || 1;
+      const reward = Math.round(base * mult);
+      coins += reward;
+      spawnFloater(HOOP_X, RIM_Y-10, '+Rp'+reward+(mult>1?' (x'+mult+')':''), '#ffd25c');
+      toast('🏀 MASUK! +Rp'+reward+(mult>1?' (bonus x'+mult+' dari skin)':''), 1600);
+    } else {
+      spawnFloater(HOOP_X, RIM_Y-10, (duel.oppName||'Lawan')+' MASUK!', '#ffb0b0');
+      toast('🏀 '+(duel.oppName||'Lawan')+' memasukkan bola!', 1400);
+    }
+    netSwing = 1;
+    spawnParticles(HOOP_X, RIM_Y, '#ffd25c', activeSkin==='dragon');
+    playRandomGoalCelebration(HOOP_X, RIM_Y);
+    // ball drops through net then bounces on floor lightly
+    bounceVel = {x:(Math.random()-0.5)*1.5, y:2};
+    ball.x = HOOP_X; ball.y = RIM_Y+6;
+  } else {
+    spawnFloater(flightHitX, flightHitY-10, 'Meleset', owner==='player'?'#ff8b8b':'#c9c9c9');
+    const angle = Math.atan2(flightHitY-flightFrom.y, flightHitX-flightFrom.x);
+    const speed = 6 + Math.random()*2;
+    bounceVel = { x: Math.cos(angle)*speed*0.5 + (Math.random()-0.5)*4, y: -Math.abs(Math.sin(angle))*speed*0.6 - 2 };
+    ball.x = flightHitX; ball.y = flightHitY;
+    spawnParticles(flightHitX, flightHitY, '#ffffff', activeSkin==='dragon');
+  }
+  if(owner==='player') updateHUD();
+  if(duel.active){
+    if(owner==='player') reportDuelShot(flightIsMake);
+    else finalizeOpponentVisualShot(flightIsMake);
+  }
+  phase='bounce';
+  bounceLife = 0;
+  shotOwner = 'player';
+  hideDuelTurnBanner();
+}
+
+function spawnFloater(x,y,text,color){
+  floaters.push({x,y,text,color,life:0});
+}
+const DRAGON_COLORS = ['#f7c6ff','#c77dff','#8a2be2','#3a1252'];
+const FIRE_COLORS = ['#ffe28a','#ff8c1a','#ff3d00'];
+function spawnParticles(x,y,color,multiColor){
+  for(let i=0;i<14;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 1+Math.random()*3;
+    const c = multiColor ? DRAGON_COLORS[Math.floor(Math.random()*DRAGON_COLORS.length)] : color;
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:0,color:c});
+  }
+}
+function skinTrailColors(skinId){
+  if(skinId==='dragon') return DRAGON_COLORS;
+  if(skinId==='fireball') return FIRE_COLORS;
+  if(skinId==='rainbow'){
+    const hue = (performance.now()/12) % 360;
+    return [hslStr(hue,95,65), hslStr(hue+90,95,65), hslStr(hue+180,95,65)];
+  }
+  const skin = SKIN_MAP[skinId]||SKIN_MAP.classic;
+  return [skin.base];
+}
+let trailTick = 0;
+function spawnBallTrail(x,y,skinId){
+  trailTick++;
+  const colors = skinTrailColors(skinId);
+  const flashy = (skinId==='dragon' || skinId==='fireball' || skinId==='rainbow');
+  const count = flashy ? 2 : 1;
+  for(let i=0;i<count;i++){
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    particles.push({
+      x:x+(Math.random()-0.5)*5, y:y+(Math.random()-0.5)*5,
+      vx:(Math.random()-0.5)*0.5, vy:(Math.random()-0.5)*0.5,
+      life:0, maxLife: flashy?26:20, size:3.2+Math.random()*2.6, color, gravity:false
+    });
+  }
+}
+function drawBallAura(x,y,r,skinId){
+  if(skinId==='dragon'){
+    ctx.save();
+    const t = performance.now()/300;
+    const pulse = 1 + Math.sin(t)*0.08;
+    const g = ctx.createRadialGradient(x,y,r*0.3, x,y,r*2.4*pulse);
+    g.addColorStop(0,'rgba(214,120,255,0.55)');
+    g.addColorStop(0.5,'rgba(138,43,226,0.32)');
+    g.addColorStop(1,'rgba(20,4,32,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(x,y,r*2.4*pulse,0,Math.PI*2); ctx.fill();
+    // orbiting glowing motes — a small ring of light circling the ball
+    const orbitCount = 5;
+    for(let i=0;i<orbitCount;i++){
+      const a = t*1.6 + (i/orbitCount)*Math.PI*2;
+      const orbitR = r*1.7 + Math.sin(t*2+i)*r*0.15;
+      const mx = x+Math.cos(a)*orbitR, my = y+Math.sin(a)*orbitR*0.55;
+      const moteAlpha = 0.5+0.5*Math.sin(t*3+i*1.7);
+      ctx.globalAlpha = moteAlpha;
+      ctx.fillStyle = i%2===0 ? '#f7c6ff' : '#a64dff';
+      ctx.beginPath(); ctx.arc(mx,my,r*0.07,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    return;
+  }
+  if(skinId==='fireball'){
+    // constantly "berkobar" (ablaze) glow, even while just held in hand
+    ctx.save();
+    const t = performance.now()/90;
+    const flicker = 0.8 + 0.2*Math.sin(t) + 0.08*Math.sin(t*2.7);
+    const g = ctx.createRadialGradient(x,y,r*0.55, x,y,r*2.1*flicker);
+    g.addColorStop(0,'rgba(255,180,60,0.5)');
+    g.addColorStop(0.55,'rgba(255,90,10,0.28)');
+    g.addColorStop(1,'rgba(255,60,0,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(x,y,r*2.1*flicker,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    return;
+  }
+}
+
+function resetBall(){
+  ball.x=HAND_X; ball.y=HAND_Y; ball.rot=0;
+  phase='idle'; power=0; powerFill.style.width='0%';
+  armPose='idle';
+  hintText.textContent='Tahan (klik / tekan Spasi) untuk isi power, lepas untuk melempar';
+}
+
+/* ============ DRAW HELPERS ============ */
+const COURT_THEMES = [
+  { name:'Gym Kayu Klasik', sky:['#3a2a1c','#6b4b2e'], floor:['#b9803f','#8f5f2c'], line:[244,227,193], plank:[0,0,0,0.18], bleacher:[0,0,0,0.12] },
+  { name:'Arena NBA Malam', sky:['#0b1130','#1c2b52'], floor:['#7a4a25','#4a2c14'], line:[255,255,255], plank:[0,0,0,0.25], bleacher:[80,140,255,0.10] },
+  { name:'Lapangan Jalanan', sky:['#38424a','#5b6b73'], floor:['#8a8a86','#5f5f5c'], line:[255,220,80], plank:[0,0,0,0.3], bleacher:[0,0,0,0.15] },
+  { name:'Sunset Pantai', sky:['#ff8a5c','#ffd27a'], floor:['#e8c48a','#c79b5f'], line:[255,255,255], plank:[120,70,20,0.22], bleacher:[255,150,80,0.12] },
+  { name:'Galaksi Neon', sky:['#170826','#3a1256'], floor:['#241238','#170822'], line:[255,80,220], plank:[0,255,255,0.14], bleacher:[180,60,255,0.16] }
+];
+let currentTheme = COURT_THEMES[Math.floor(Math.random()*COURT_THEMES.length)];
+
+function drawCourt(){
+  const th = currentTheme;
+  // sky/gym wall
+  const skyGrad = ctx.createLinearGradient(0,0,0,GROUND_Y);
+  skyGrad.addColorStop(0,th.sky[0]);
+  skyGrad.addColorStop(1,th.sky[1]);
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0,0,W,GROUND_Y);
+
+  // bleacher stripes
+  const [br,bg,bb,ba] = th.bleacher.length===4?th.bleacher:[...th.bleacher,0.12];
+  ctx.fillStyle = 'rgba('+br+','+bg+','+bb+','+ba+')';
+  for(let i=0;i<6;i++){
+    ctx.fillRect(0, 10+i*14, W, 6);
+  }
+
+  // floor
+  const floorGrad = ctx.createLinearGradient(0,GROUND_Y,0,H);
+  floorGrad.addColorStop(0,th.floor[0]);
+  floorGrad.addColorStop(1,th.floor[1]);
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0,GROUND_Y,W,H-GROUND_Y);
+
+  // floor planks (perspective lines converging toward hoop base)
+  const [pr,pg,pb,pa] = th.plank.length===4?th.plank:[...th.plank,0.18];
+  ctx.strokeStyle = 'rgba('+pr+','+pg+','+pb+','+pa+')';
+  ctx.lineWidth = 1;
+  const vanishX = HOOP_X;
+  for(let i=-8;i<=8;i++){
+    ctx.beginPath();
+    ctx.moveTo(vanishX + i*10, GROUND_Y);
+    ctx.lineTo(vanishX + i*70, H);
+    ctx.stroke();
+  }
+  // key / paint arc
+  const [lr,lg,lb] = th.line;
+  ctx.strokeStyle = 'rgba('+lr+','+lg+','+lb+',0.55)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(HOOP_X, GROUND_Y+6, 150, 20, 0, 0, Math.PI, false);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(HOOP_X, GROUND_Y+40, 90, Math.PI*1.05, Math.PI*1.95);
+  ctx.stroke();
+
+  // free-throw line near camera
+  ctx.strokeStyle = 'rgba('+lr+','+lg+','+lb+',0.4)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(HAND_X-140, H-40);
+  ctx.lineTo(HAND_X+260, H-40);
+  ctx.stroke();
+}
+
+function drawPole(){
+  // pole + base to the right of the board, going to floor
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(HOOP_X+70, BOARD_TOP-10, 10, GROUND_Y-BOARD_TOP+40);
+  ctx.fillStyle = '#1c1c1c';
+  ctx.fillRect(HOOP_X+50, GROUND_Y+30, 60, 12);
+  // support arm from pole to backboard
+  ctx.strokeStyle = '#3a3a3a';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(HOOP_X+70, BOARD_TOP+10);
+  ctx.lineTo(BOARD_CX+BOARD_HALF_W, BOARD_TOP+40);
+  ctx.stroke();
+}
+
+function drawBackboard(){
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.fillRect(BOARD_CX-BOARD_HALF_W+4, BOARD_TOP+4, BOARD_HALF_W*2, BOARD_BOTTOM-BOARD_TOP);
+  // board
+  const g = ctx.createLinearGradient(0,BOARD_TOP,0,BOARD_BOTTOM);
+  g.addColorStop(0,'#fdfdfd'); g.addColorStop(1,'#dcdcdc');
+  ctx.fillStyle=g;
+  ctx.fillRect(BOARD_CX-BOARD_HALF_W, BOARD_TOP, BOARD_HALF_W*2, BOARD_BOTTOM-BOARD_TOP);
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=3;
+  ctx.strokeRect(BOARD_CX-BOARD_HALF_W+4, BOARD_TOP+4, BOARD_HALF_W*2-8, BOARD_BOTTOM-BOARD_TOP-8);
+  // inner shot square
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=2.5;
+  ctx.strokeRect(BOARD_CX-20, BOARD_BOTTOM-34, 40, 26);
+}
+
+function drawRimAndNet(){
+  // rim back edge (behind ball visually simplified: draw full ellipse ring)
+  ctx.save();
+  ctx.strokeStyle='#e2531b';
+  ctx.lineWidth=6;
+  ctx.beginPath();
+  ctx.ellipse(HOOP_X, RIM_Y, RIM_RX, RIM_RY, 0, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.strokeStyle='#ff7a33';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.ellipse(HOOP_X, RIM_Y-1, RIM_RX-3, RIM_RY-2, 0, Math.PI, Math.PI*2);
+  ctx.stroke();
+
+  // net
+  const swing = Math.sin(performance.now()/160) * (0.5+netSwing*3);
+  const bottomY = RIM_Y+52;
+  const strands = 10;
+  ctx.strokeStyle='rgba(255,255,255,0.85)';
+  ctx.lineWidth=1.4;
+  for(let i=0;i<strands;i++){
+    const a = (i/strands)*Math.PI*2;
+    const topX = HOOP_X + Math.cos(a)*RIM_RX*0.95;
+    const topYr = RIM_Y + Math.sin(a)*RIM_RY*0.95;
+    const botX = HOOP_X + Math.cos(a)*RIM_RX*0.32 + swing*4;
+    ctx.beginPath();
+    ctx.moveTo(topX, topYr);
+    ctx.quadraticCurveTo(HOOP_X + Math.cos(a)*RIM_RX*0.6, (topYr+bottomY)/2, botX, bottomY);
+    ctx.stroke();
+  }
+  // horizontal net rings
+  for(let j=1;j<=2;j++){
+    const ry = RIM_Y + (bottomY-RIM_Y)*(j/3);
+    const rx = RIM_RX * (1-(j/3)*0.65);
+    ctx.beginPath();
+    ctx.ellipse(HOOP_X+swing*2, ry, rx, RIM_RY*0.8, 0, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  netSwing *= 0.92;
+  ctx.restore();
+}
+
+// Fixed-seed decorative data so these patterns look "designed" instead of
+// re-randomizing (and flickering) every single frame.
+const GOLD_SPARKLES = Array.from({length:9}, ()=>({
+  x:(Math.random()*2-1)*0.62, y:(Math.random()*2-1)*0.62,
+  size:0.06+Math.random()*0.07, phase:Math.random()*Math.PI*2, speed:2+Math.random()*2.4
+}));
+const DRAGON_SPECKLE_COLORS = ['#fce8ff','#e0aaff','#c77dff','#a64dff','#7a1fb8','#3a1250'];
+const DRAGON_SPECKLES = Array.from({length:46}, ()=>{
+  const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*0.92;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, size:0.05+Math.random()*0.07,
+    colorIdx: Math.floor(Math.random()*DRAGON_SPECKLE_COLORS.length) };
+});
+// Kristal Es: a few large faceted ice panes (filled, shaded polygons) plus
+// thin, low-opacity crack lines for texture — the panes read as solid
+// crystal chunks so the cracks don't look like a wireframe sketch floating
+// over the ball.
+const ICE_FACETS = (()=>{
+  const n = 6, facets = [];
+  let a = Math.random()*Math.PI*2;
+  for(let i=0;i<n;i++){
+    const width = (Math.PI*2/n) * (0.8+Math.random()*0.4);
+    facets.push({ a1:a, a2:a+width, bright: i%2===0 ? 0.16 : -0.08 });
+    a += width;
+  }
+  return facets;
+})();
+const ICE_SHARDS = Array.from({length:5}, ()=>{
+  const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*0.65;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, rot:Math.random()*Math.PI*2, len:0.3+Math.random()*0.28 };
+});
+// Bola Racun: bubbling toxic blobs, each pulses at its own phase/speed
+const TOXIC_BUBBLES = Array.from({length:10}, ()=>{
+  const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*0.8;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, size:0.08+Math.random()*0.12,
+    phase:Math.random()*Math.PI*2, speed:1.2+Math.random()*1.6 };
+});
+// Bola Petir: fixed bolt anchor angles, redrawn with a live jagged zig-zag each frame
+const THUNDER_BOLTS = Array.from({length:5}, (_,i)=>({ angle: (i/5)*Math.PI*2 + Math.random()*0.4, seedA:Math.random()*10, seedB:Math.random()*10 }));
+// Bola Sakura: falling/floating petal positions (fixed layout, gentle sway animated)
+const SAKURA_PETALS = Array.from({length:12}, ()=>{
+  const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*0.88;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, size:0.09+Math.random()*0.08, rot:Math.random()*Math.PI*2, swaySpeed:0.6+Math.random()*0.8, swayPhase:Math.random()*Math.PI*2 };
+});
+// Bola Berlian: sparkle points (facet wedges are defined further down as
+// DIAMOND_WEDGES, near the other pattern-specific helper arrays)
+const DIAMOND_SPARKLES = Array.from({length:7}, ()=>({
+  x:(Math.random()*2-1)*0.6, y:(Math.random()*2-1)*0.6,
+  size:0.05+Math.random()*0.06, phase:Math.random()*Math.PI*2, speed:2.4+Math.random()*2.2
+}));
+// Bola Galaksi Cincin: nebula star-field + colored nebula clouds on the sphere,
+// plus a ring of rock/dust specks orbiting outside the sphere
+const COSMIC_STARS = Array.from({length:26}, ()=>{
+  const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*0.95;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, size:0.3+Math.random()*1.1, phase:Math.random()*Math.PI*2, speed:1+Math.random()*1.5 };
+});
+const COSMIC_NEBULA_COLORS = ['rgba(255,110,220,0.35)','rgba(120,140,255,0.35)','rgba(150,255,230,0.28)','rgba(255,180,110,0.25)'];
+const COSMIC_NEBULA = Array.from({length:5}, (_,i)=>{
+  const a = Math.random()*Math.PI*2, d = Math.random()*0.6;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, size:0.35+Math.random()*0.35, colorIdx:i%COSMIC_NEBULA_COLORS.length };
+});
+const COSMIC_RING_ROCKS = Array.from({length:34}, ()=>{
+  const a = Math.random()*Math.PI*2;
+  return { a, radiusMult:1.35+Math.random()*0.55, size:0.02+Math.random()*0.035, tw:Math.random()*Math.PI*2 };
+});
+// Galaxy Ungu (rare skin): fixed star-field so it twinkles in place instead
+// of re-randomizing every single frame (which read as flickering noise/a
+// "sketchy" double image rather than a starry surface).
+const GALAXY_STARS = Array.from({length:20}, ()=>{
+  const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*0.94;
+  return { x:Math.cos(a)*d, y:Math.sin(a)*d, size:0.6+Math.random()*1.6, phase:Math.random()*Math.PI*2, speed:0.8+Math.random()*1.4 };
+});
+// Bola Rainbow RGB: a soft diagonal shine streak that sweeps across the
+// surface, layered on top of the color bands for a glossy holographic feel.
+const RAINBOW_SPARKLES = Array.from({length:8}, ()=>({
+  x:(Math.random()*2-1)*0.65, y:(Math.random()*2-1)*0.65,
+  size:0.05+Math.random()*0.06, phase:Math.random()*Math.PI*2, speed:1.8+Math.random()*2
+}));
+// Bola Berlian: real cut-gem facets — filled triangular wedges from center
+// to edge, alternating brightness, instead of plain radiating lines (which
+// read as a wireframe sketch drawn over the ball rather than a solid gem).
+const DIAMOND_WEDGES = (()=>{
+  const n = 10, wedges = [];
+  let a = Math.random()*Math.PI*2;
+  for(let i=0;i<n;i++){
+    const width = (Math.PI*2/n) * (0.75+Math.random()*0.5);
+    wedges.push({ a1:a, a2:a+width, bright: i%2===0 ? 0.22 : -0.1 });
+    a += width;
+  }
+  // normalize so the wedges still sum to a full circle
+  const total = wedges[wedges.length-1].a2 - wedges[0].a1;
+  const scale = (Math.PI*2)/total;
+  const start = wedges[0].a1;
+  wedges.forEach(w=>{ w.a1 = start + (w.a1-start)*scale; w.a2 = start + (w.a2-start)*scale; });
+  return wedges;
+})();
+function drawStarShape(ctx, cx, cy, outerR, innerR, points){
+  ctx.beginPath();
+  for(let i=0;i<points*2;i++){
+    const rad = (i%2===0) ? outerR : innerR;
+    const a = (Math.PI/points)*i - Math.PI/2;
+    const px = cx + Math.cos(a)*rad, py = cy + Math.sin(a)*rad;
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+}
+
+// Draws the Bola Galaksi Cincin's orbiting ring. Called twice per ball:
+// once with mode 'back' (before the sphere is filled, so the sphere paints
+// over the far side) and once with mode 'front' (after, drawing only the
+// near arc on top) — giving the classic Saturn-style ring illusion.
+function drawCosmicRing(r, mode){
+  const t = performance.now()/1000;
+  const spin = t*0.25;
+  ctx.save();
+  ctx.rotate(0.5); // fixed tilt so the ring reads as an ellipse, not a circle
+  ctx.scale(1, 0.4);
+  if(mode==='back'){
+    // dusty ring band, full ellipse (sphere drawn right after will cover
+    // the portion that should appear behind it)
+    const ringGrad = ctx.createRadialGradient(0,0,r*1.3, 0,0,r*2.0);
+    ringGrad.addColorStop(0,'rgba(180,150,255,0)');
+    ringGrad.addColorStop(0.5,'rgba(190,160,255,0.55)');
+    ringGrad.addColorStop(0.85,'rgba(120,200,255,0.35)');
+    ringGrad.addColorStop(1,'rgba(120,200,255,0)');
+    ctx.strokeStyle = ringGrad;
+    ctx.lineWidth = r*0.5;
+    ctx.beginPath(); ctx.arc(0,0,r*1.65,0,Math.PI*2); ctx.stroke();
+  }
+  COSMIC_RING_ROCKS.forEach(rock=>{
+    const a = rock.a + spin;
+    const isFront = Math.sin(a) > 0; // near half vs far half of the ellipse
+    if(mode==='front' && !isFront) return;
+    if(mode==='back' && isFront) return;
+    const px = Math.cos(a)*r*rock.radiusMult, py = Math.sin(a)*r*rock.radiusMult;
+    const tw = 0.5+0.5*Math.abs(Math.sin(t*2+rock.tw));
+    ctx.globalAlpha = tw;
+    ctx.fillStyle = '#e6d9ff';
+    ctx.beginPath(); ctx.arc(px,py,r*rock.size,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawBallSkin(x,y,r,skinId,rot){
+  const skin = SKIN_MAP[skinId]||SKIN_MAP.classic;
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(rot);
+
+  // base sphere gradient
+  const g = ctx.createRadialGradient(-r*0.35,-r*0.4,r*0.15, 0,0,r*1.05);
+  if(skin.pattern==='gold'){
+    g.addColorStop(0,'#fff6d0'); g.addColorStop(0.5,skin.base); g.addColorStop(1,'#8a5b04');
+  } else if(skin.pattern==='rainbow'){
+    const hue = (performance.now()/12) % 360;
+    g.addColorStop(0,'#ffffff');
+    g.addColorStop(0.32, hslStr(hue,95,72));
+    g.addColorStop(0.66, hslStr(hue+110,90,55));
+    g.addColorStop(1, hslStr(hue+220,80,28));
+  } else if(skin.pattern==='dragon'){
+    g.addColorStop(0,'#fbe8ff'); g.addColorStop(0.4,'#b266ff'); g.addColorStop(0.75,'#5a1a80'); g.addColorStop(1,'#160522');
+  } else if(skin.pattern==='eclipse'){
+    g.addColorStop(0,'#2a2a30'); g.addColorStop(0.55,'#0d0d10'); g.addColorStop(1,'#000000');
+  } else if(skin.pattern==='inferno'){
+    g.addColorStop(0,'#fff6c8'); g.addColorStop(0.35,'#ffb02e'); g.addColorStop(0.7,'#ff4d0f'); g.addColorStop(1,'#3a0a00');
+  } else if(skin.pattern==='ice'){
+    g.addColorStop(0,'#ffffff'); g.addColorStop(0.4,'#bff2ff'); g.addColorStop(0.75,'#59c6e6'); g.addColorStop(1,'#0d3a4a');
+  } else if(skin.pattern==='toxic'){
+    g.addColorStop(0,'#e8ffcf'); g.addColorStop(0.45,'#8de63a'); g.addColorStop(0.8,'#3f9410'); g.addColorStop(1,'#0c2e04');
+  } else if(skin.pattern==='thunder'){
+    g.addColorStop(0,'#eaf0ff'); g.addColorStop(0.4,'#5a86ff'); g.addColorStop(0.75,'#1c3ab0'); g.addColorStop(1,'#060b2e');
+  } else if(skin.pattern==='sakura'){
+    g.addColorStop(0,'#fff2f8'); g.addColorStop(0.45,'#ffb6d9'); g.addColorStop(0.8,'#ef6fa8'); g.addColorStop(1,'#6e1a3e');
+  } else if(skin.pattern==='diamond'){
+    g.addColorStop(0,'#ffffff'); g.addColorStop(0.4,'#eaf9ff'); g.addColorStop(0.75,'#a9d8ec'); g.addColorStop(1,'#4a7a8f');
+  } else if(skin.pattern==='cosmicring'){
+    g.addColorStop(0,'#e6d9ff'); g.addColorStop(0.35,'#7a52d6'); g.addColorStop(0.7,'#2c1a63'); g.addColorStop(1,'#08051a');
+  } else {
+    g.addColorStop(0, lighten(skin.base,45));
+    g.addColorStop(0.55, skin.base);
+    g.addColorStop(1, darken(skin.base,35));
+  }
+
+  // Bola Galaksi Cincin: draw the far half of the ring FIRST so the sphere
+  // painted right after naturally occludes it, like Saturn's rings passing
+  // behind the planet.
+  if(skin.pattern==='cosmicring') drawCosmicRing(r, 'back');
+
+  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+
+  // pattern overlays
+  ctx.save();
+  ctx.clip();
+  if(skin.pattern==='stripe'){
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=4;
+    for(let i=-r;i<r;i+=8){ ctx.beginPath(); ctx.moveTo(i,-r); ctx.lineTo(i+r*0.6,r); ctx.stroke(); }
+  } else if(skin.pattern==='carbon'){
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=2;
+    for(let i=-r;i<r;i+=5){ ctx.beginPath(); ctx.moveTo(-r,i); ctx.lineTo(r,i+6); ctx.stroke(); }
+  } else if(skin.pattern==='galaxy'){
+    const gt = performance.now();
+    GALAXY_STARS.forEach(s=>{
+      const tw = 0.35+0.65*Math.abs(Math.sin(gt/320*s.speed+s.phase));
+      ctx.globalAlpha = tw;
+      ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.arc(s.x*r, s.y*r, s.size, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  } else if(skin.pattern==='rainbow'){
+    const hue2 = (performance.now()/12) % 360;
+    ctx.lineWidth = r*0.34;
+    for(let i=-1;i<=6;i++){
+      const bandHue = hue2 + i*32;
+      ctx.strokeStyle = hslStr(bandHue, 95, 62);
+      ctx.beginPath();
+      ctx.moveTo(-r*1.3 + i*(r*0.42), -r*1.3);
+      ctx.lineTo(-r*1.3 + i*(r*0.42) + r*1.2, r*1.3);
+      ctx.stroke();
+    }
+    // diagonal glossy shine sweeping across the bands
+    const shineT = (performance.now()/900) % 2 - 1; // sweeps from -1..1
+    const shineX = shineT*r*1.6;
+    const shine = ctx.createLinearGradient(shineX-r*0.5,-r, shineX+r*0.5, r);
+    shine.addColorStop(0,'rgba(255,255,255,0)');
+    shine.addColorStop(0.5,'rgba(255,255,255,0.55)');
+    shine.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle = shine;
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+    // twinkling sparkle points for extra legendary sparkle
+    const rt = performance.now();
+    RAINBOW_SPARKLES.forEach(s=>{
+      const tw = 0.3+0.7*Math.abs(Math.sin(rt/280*s.speed+s.phase));
+      ctx.globalAlpha = tw;
+      drawStarShape(ctx, s.x*r, s.y*r, r*s.size, r*s.size*0.4, 4);
+      ctx.fillStyle='#ffffff'; ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  } else if(skin.pattern==='gold'){
+    const t = performance.now();
+    GOLD_SPARKLES.forEach(s=>{
+      const tw = 0.4 + 0.6*Math.abs(Math.sin(t/300*s.speed + s.phase));
+      ctx.globalAlpha = tw;
+      drawStarShape(ctx, s.x*r, s.y*r, r*s.size, r*s.size*0.42, 4);
+      ctx.fillStyle = '#fff6c2';
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  } else if(skin.pattern==='dragon'){
+    DRAGON_SPECKLES.forEach(sp=>{
+      ctx.fillStyle = DRAGON_SPECKLE_COLORS[sp.colorIdx];
+      ctx.fillRect(sp.x*r - sp.size*r*0.5, sp.y*r - sp.size*r*0.5, sp.size*r, sp.size*r);
+    });
+    // dragon eye — glowing iris with a reptilian slit pupil
+    ctx.beginPath(); ctx.ellipse(-r*0.15,-r*0.55,r*0.12,r*0.08,0.2,0,Math.PI*2);
+    ctx.fillStyle='#f7e6ff'; ctx.fill();
+    ctx.save();
+    ctx.translate(-r*0.15,-r*0.55); ctx.rotate(0.2);
+    ctx.beginPath(); ctx.ellipse(0,0,r*0.018,r*0.065,0,0,Math.PI*2);
+    ctx.fillStyle='#2b0a3d'; ctx.fill();
+    ctx.restore();
+  } else if(skin.pattern==='eclipse'){
+    // faint crater-like darker patches for texture on the void surface
+    ctx.fillStyle='rgba(255,255,255,0.05)';
+    for(let i=0;i<8;i++){
+      const a=(i/8)*Math.PI*2+0.4, d=r*0.5;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*d, Math.sin(a)*d, r*0.12, 0, Math.PI*2); ctx.fill();
+    }
+  } else if(skin.pattern==='ice'){
+    // solid faceted panes first (so the surface reads as chunky crystal,
+    // not a flat circle with lines drawn over it)
+    ICE_FACETS.forEach(f=>{
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0,0,r,f.a1,f.a2);
+      ctx.closePath();
+      ctx.fillStyle = f.bright>0 ? 'rgba(255,255,255,'+f.bright+')' : 'rgba(20,60,80,'+(-f.bright)+')';
+      ctx.fill();
+    });
+    // thin, low-opacity crack lines for texture — subtle enough to read as
+    // surface detail rather than a wireframe sketch
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=Math.max(1,r*0.025);
+    ICE_SHARDS.forEach(s=>{
+      ctx.save();
+      ctx.translate(s.x*r, s.y*r); ctx.rotate(s.rot);
+      ctx.beginPath();
+      ctx.moveTo(0,0); ctx.lineTo(r*s.len,0);
+      ctx.moveTo(0,0); ctx.lineTo(r*s.len*0.6, r*s.len*0.5);
+      ctx.stroke();
+      ctx.restore();
+    });
+    // cold inner glow
+    const iceGlow = ctx.createRadialGradient(0,0,0,0,0,r);
+    iceGlow.addColorStop(0,'rgba(255,255,255,0.30)'); iceGlow.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=iceGlow; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+  } else if(skin.pattern==='toxic'){
+    const tt = performance.now();
+    TOXIC_BUBBLES.forEach(b=>{
+      const pulse = 0.7+0.3*Math.sin(tt/300*b.speed+b.phase);
+      ctx.beginPath(); ctx.arc(b.x*r, b.y*r, r*b.size*pulse, 0, Math.PI*2);
+      ctx.fillStyle='rgba(200,255,120,0.35)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x*r, b.y*r, r*b.size*pulse*0.5, 0, Math.PI*2);
+      ctx.fillStyle='rgba(255,255,220,0.5)'; ctx.fill();
+    });
+  } else if(skin.pattern==='thunder'){
+    const tt2 = performance.now()/1000;
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    THUNDER_BOLTS.forEach(b=>{
+      // continuous brightness pulse instead of a hard on/off flicker — the
+      // old version popped bolts fully in and out of existence, which read
+      // as a flashing "ghost" line rather than crackling electricity
+      const glow = 0.15+0.85*Math.pow(0.5+0.5*Math.sin(tt2*3.4+b.seedA*6), 3);
+      if(glow < 0.08) return;
+      ctx.globalAlpha = glow;
+      ctx.strokeStyle='rgba(220,235,255,0.95)'; ctx.lineWidth=Math.max(1.4,r*0.06);
+      ctx.beginPath();
+      let px=0, py=0;
+      ctx.moveTo(px,py);
+      const steps=4;
+      for(let i=1;i<=steps;i++){
+        const dist = (r*0.95)*(i/steps);
+        const jitter = (Math.sin(tt2*4+i*3+b.seedA)*0.22);
+        const a = b.angle + jitter*(i/steps);
+        px = Math.cos(a)*dist; py = Math.sin(a)*dist;
+        ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+  } else if(skin.pattern==='sakura'){
+    const tt3 = performance.now()/1000;
+    SAKURA_PETALS.forEach(p=>{
+      const sway = Math.sin(tt3*p.swaySpeed+p.swayPhase)*0.3;
+      ctx.save();
+      ctx.translate(p.x*r, p.y*r); ctx.rotate(p.rot+sway);
+      ctx.fillStyle='rgba(255,230,244,0.85)';
+      ctx.beginPath();
+      ctx.ellipse(0,0, r*p.size, r*p.size*0.55, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle='rgba(230,70,140,0.55)';
+      ctx.beginPath(); ctx.arc(0,0, r*p.size*0.18, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+  } else if(skin.pattern==='diamond'){
+    // filled, alternating-brightness gem wedges so it reads as a solid cut
+    // diamond rather than a wireframe of lines drawn over a plain circle
+    DIAMOND_WEDGES.forEach(w=>{
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0,0,r,w.a1,w.a2);
+      ctx.closePath();
+      ctx.fillStyle = w.bright>0 ? 'rgba(255,255,255,'+w.bright+')' : 'rgba(70,110,130,'+(-w.bright)+')';
+      ctx.fill();
+    });
+    // thin facet edge lines, subtle
+    ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=Math.max(1,r*0.02);
+    DIAMOND_WEDGES.forEach(w=>{
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(w.a1)*r, Math.sin(w.a1)*r); ctx.stroke();
+    });
+    const dt = performance.now();
+    DIAMOND_SPARKLES.forEach(s=>{
+      const tw = 0.3+0.7*Math.abs(Math.sin(dt/300*s.speed+s.phase));
+      ctx.globalAlpha = tw;
+      drawStarShape(ctx, s.x*r, s.y*r, r*s.size, r*s.size*0.38, 4);
+      ctx.fillStyle='#ffffff'; ctx.fill();
+    });
+    ctx.globalAlpha=1;
+  } else if(skin.pattern==='cosmicring'){
+    const spinT = performance.now()/1000;
+    ctx.save();
+    ctx.rotate(spinT*0.18); // the whole nebula surface slowly spins, not just the ring
+    COSMIC_NEBULA.forEach(n=>{
+      const neb = ctx.createRadialGradient(n.x*r,n.y*r,0, n.x*r,n.y*r, r*n.size);
+      neb.addColorStop(0, COSMIC_NEBULA_COLORS[n.colorIdx]);
+      neb.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle=neb;
+      ctx.beginPath(); ctx.arc(n.x*r, n.y*r, r*n.size, 0, Math.PI*2); ctx.fill();
+    });
+    const ct = performance.now();
+    COSMIC_STARS.forEach(s=>{
+      const tw = 0.4+0.6*Math.abs(Math.sin(ct/300*s.speed+s.phase));
+      ctx.globalAlpha = tw;
+      ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.arc(s.x*r, s.y*r, s.size, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    ctx.restore();
+  } else if(skin.pattern==='inferno'){
+    const t = performance.now()/260;
+    ctx.lineCap='round';
+    for(let i=0;i<7;i++){
+      const a = (i/7)*Math.PI*2 + t*0.6;
+      const wobble = Math.sin(t*2+i)*0.3;
+      const x1 = Math.cos(a)*r*0.15, y1 = Math.sin(a)*r*0.15;
+      const x2 = Math.cos(a+wobble)*r*0.95, y2 = Math.sin(a+wobble)*r*0.95;
+      const flameGrad = ctx.createLinearGradient(x1,y1,x2,y2);
+      flameGrad.addColorStop(0,'rgba(255,240,180,0.9)');
+      flameGrad.addColorStop(0.6,'rgba(255,120,20,0.6)');
+      flameGrad.addColorStop(1,'rgba(180,20,0,0)');
+      ctx.strokeStyle = flameGrad;
+      ctx.lineWidth = r*0.16;
+      ctx.beginPath();
+      ctx.moveTo(x1,y1);
+      ctx.quadraticCurveTo(Math.cos(a+wobble*0.5)*r*0.6, Math.sin(a+wobble*0.5)*r*0.6, x2, y2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // seams (classic basketball lines) - skipped for Eclipse and the cosmic
+  // ring ball, which read better as smooth void/nebula spheres than a
+  // gripped basketball
+  if(skin.pattern!=='eclipse' && skin.pattern!=='cosmicring'){
+    ctx.strokeStyle = skin.seam;
+    ctx.lineWidth = Math.max(1.6, r*0.09);
+    ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r,0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-r); ctx.lineTo(0,r); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r,0);
+    ctx.quadraticCurveTo(0,-r*0.55,r,0);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r,0);
+    ctx.quadraticCurveTo(0,r*0.55,r,0);
+    ctx.stroke();
+  }
+
+  // highlight
+  ctx.beginPath();
+  ctx.arc(-r*0.35,-r*0.4,r*0.28,0,Math.PI*2);
+  ctx.fillStyle = (skin.pattern==='eclipse'||skin.pattern==='cosmicring') ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.28)';
+  ctx.fill();
+
+  if(skin.pattern==='eclipse'){
+    // bright corona ring, like the reference solar-eclipse photo
+    const t3 = performance.now()/1000;
+    ctx.save();
+    ctx.rotate(t3*0.15);
+    const corona = ctx.createRadialGradient(0,0,r*0.97, 0,0,r*1.55);
+    corona.addColorStop(0,'rgba(255,255,255,0.95)');
+    corona.addColorStop(0.25,'rgba(210,225,255,0.55)');
+    corona.addColorStop(1,'rgba(180,200,255,0)');
+    ctx.fillStyle = corona;
+    ctx.beginPath(); ctx.arc(0,0,r*1.55,0,Math.PI*2); ctx.arc(0,0,r*0.985,0,Math.PI*2,true); ctx.fill();
+    // faint radiating rays for a "perfect" polished eclipse look
+    ctx.strokeStyle='rgba(255,255,255,0.35)';
+    ctx.lineWidth = r*0.03;
+    for(let i=0;i<14;i++){
+      const a = (i/14)*Math.PI*2;
+      const len = r*(1.1 + 0.35*(0.5+0.5*Math.sin(t3*2+i*1.3)));
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*1.05, Math.sin(a)*r*1.05);
+      ctx.lineTo(Math.cos(a)*len, Math.sin(a)*len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if(skin.pattern==='cosmicring'){
+    // soft violet corona around the sphere itself
+    const t4 = performance.now()/1000;
+    const cosmicGlow = ctx.createRadialGradient(0,0,r*0.9, 0,0,r*1.3);
+    cosmicGlow.addColorStop(0,'rgba(170,130,255,0.45)');
+    cosmicGlow.addColorStop(1,'rgba(170,130,255,0)');
+    ctx.fillStyle = cosmicGlow;
+    ctx.beginPath(); ctx.arc(0,0,r*1.3,0,Math.PI*2); ctx.arc(0,0,r*0.95,0,Math.PI*2,true); ctx.fill();
+    // the near half of the ring, drawn on top of the sphere so it reads as
+    // passing in front, completing the Saturn-like silhouette
+    drawCosmicRing(r, 'front');
+    void t4;
+  }
+
+  if(skin.pattern==='inferno'){
+    const t2 = performance.now()/180;
+    for(let i=0;i<10;i++){
+      const a = (i/10)*Math.PI*2 + Math.sin(t2*0.7+i)*0.15;
+      const len = r*(0.28+0.18*Math.abs(Math.sin(t2+i*1.7)));
+      const bx = Math.cos(a)*r*0.98, by = Math.sin(a)*r*0.98;
+      const tx = Math.cos(a)*(r+len), ty = Math.sin(a)*(r+len);
+      const midA = a + Math.sin(t2*1.3+i)*0.25;
+      const mx = Math.cos(midA)*(r+len*0.55), my = Math.sin(midA)*(r+len*0.55);
+      const flick = ctx.createLinearGradient(bx,by,tx,ty);
+      flick.addColorStop(0,'rgba(255,200,80,0.85)');
+      flick.addColorStop(1,'rgba(255,60,0,0)');
+      ctx.strokeStyle = flick;
+      ctx.lineWidth = r*0.1;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(bx,by);
+      ctx.quadraticCurveTo(mx,my,tx,ty);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+function lighten(hex,amt){return shade(hex,amt);}
+function darken(hex,amt){return shade(hex,-amt);}
+function hslStr(h,s,l){ return 'hsl('+((h%360+360)%360)+','+s+'%,'+l+'%)'; }
+function shade(hex,amt){
+  const c = hex.replace('#','');
+  const num = parseInt(c,16);
+  let r=(num>>16)+amt, g=((num>>8)&0xff)+amt, b=(num&0xff)+amt;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return '#'+(r<<16|g<<8|b).toString(16).padStart(6,'0');
+}
+
+function drawArm(){
+  // first-person: two hands cradle the ball together, dip down while
+  // charging (loading the shot), then rise together into a shot release
+  // (not a wide reach / layup motion).
+  const showBallInHand = (phase==='idle'||phase==='charging');
+  let dip = 0, lift = 0;
+  if(phase==='charging'){
+    dip = (power/100) * 42;
+  } else if(armPose==='throw'){
+    armThrowT += 1;
+    const p = Math.min(1, armThrowT/14);
+    dip = (1-p) * (armPullAtRelease*42);
+    lift = easeOutQuad(p) * 145;
+    if(p>=1) armPose='idle';
+  }
+
+  const centerX = HAND_X;
+  const centerY = HAND_Y + dip - lift;
+  const gap = 30 + dip*0.15; // hands stay close together, cradling the ball
+
+  drawOneHand(-1, centerX, centerY, gap, dip, lift);
+  drawOneHand( 1, centerX, centerY, gap, dip, lift);
+
+  // clear opponent-turn callout, drawn once (not per-hand) so it isn't
+  // duplicated — this plus the reddish sleeves/glow and the top banner
+  // make it unmistakable when the bot/opponent is the one shooting
+  if(shotOwner==='opponent'){
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.font='bold 15px "Trebuchet MS",sans-serif';
+    ctx.fillStyle='rgba(0,0,0,.55)';
+    ctx.fillText('🤖 '+(duel.oppName||'Lawan')+' menembak…', centerX+1, centerY-93+1);
+    ctx.fillStyle='#ff8f8f';
+    ctx.fillText('🤖 '+(duel.oppName||'Lawan')+' menembak…', centerX, centerY-93);
+    ctx.restore();
+  }
+
+  if(showBallInHand){
+    // ball rests right against the palms, overlapping slightly so it
+    // visibly touches both hands instead of floating above them
+    ball.x = centerX; ball.y = centerY - ball.r*0.82;
+  } else if(armPose==='throw'){
+    // during the release itself, keep the ball glued to the rising hands
+    // for the first few frames so the lift reads as one motion
+    if(armThrowT<=6){ ball.x = centerX; ball.y = centerY - ball.r*0.82; }
+  }
+}
+
+function drawOneHand(sign, centerX, centerY, gap, dip, lift){
+  ctx.save();
+  const baseX = HAND_X + sign*95, baseY = H+55;
+  const elbowX = HAND_X + sign*60 + sign*dip*0.15;
+  const elbowY = baseY - 150 + dip*0.35 - lift*0.55;
+  const handX = centerX + sign*gap;
+  const handY = centerY + 26 - lift*0.1;
+  const isOpp = shotOwner==='opponent';
+
+  // whole arm (sleeve, forearm, palm, fingers) tints red during a simulated
+  // opponent/bot turn so it's unmistakably "not you" shooting, even though
+  // it reuses the same first-person rig
+  const skinTone = isOpp ? '#e0898f' : '#e6a877';
+
+  if(isOpp){
+    // soft red glow behind the hand makes the opponent's turn readable even
+    // at a glance, not just on close inspection of arm color
+    const glow = ctx.createRadialGradient(handX,handY,0, handX,handY,42);
+    glow.addColorStop(0,'rgba(255,70,70,0.30)');
+    glow.addColorStop(1,'rgba(255,70,70,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(handX,handY,42,0,Math.PI*2); ctx.fill();
+  }
+
+  // upper sleeve
+  ctx.strokeStyle = isOpp ? '#d6454f' : '#c98a5b';
+  ctx.lineWidth = 34;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(baseX, baseY);
+  ctx.lineTo(elbowX, elbowY);
+  ctx.stroke();
+
+  // forearm
+  ctx.strokeStyle = skinTone;
+  ctx.lineWidth = 24;
+  ctx.beginPath();
+  ctx.moveTo(elbowX, elbowY);
+  ctx.lineTo(handX, handY);
+  ctx.stroke();
+
+  // palm, cupped around the ball from below/the side
+  const palmAngle = -sign*0.42;
+  ctx.fillStyle = skinTone;
+  ctx.beginPath();
+  ctx.ellipse(handX, handY, 19, 15, palmAngle, 0, Math.PI*2);
+  ctx.fill();
+
+  // fingers wrapped up against the ball's surface (touching it), rather
+  // than fanned open and away from it
+  for(let i=-2;i<=2;i++){
+    const a = palmAngle + i*0.26 - sign*0.12;
+    const fx = handX + Math.cos(a)*17;
+    const fy = handY + Math.sin(a)*17 - 16;
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 4.4, 13, a, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawVignette(){
+  const g = ctx.createRadialGradient(W/2,H*0.42,H*0.25, W/2,H*0.5,W*0.72);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.38)');
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+function drawFloatersAndParticles(dt){
+  particles.forEach(p=>{
+    if(p.shape!=='ring'){
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.gravity!==false) p.vy+=0.15;
+    }
+    if(p.vr) p.rot = (p.rot||0)+p.vr;
+    p.life+=dt;
+  });
+  particles = particles.filter(p=>p.life<(p.maxLife||40));
+  particles.forEach(p=>{
+    const maxLife = p.maxLife||40;
+    const alpha = Math.max(0,Math.min(1,1-p.life/maxLife));
+    ctx.globalAlpha = alpha;
+    if(p.shape==='star'){
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot||0);
+      drawStarShape(ctx,0,0,p.size||5,(p.size||5)*0.45,5);
+      ctx.fillStyle=p.color; ctx.fill();
+      ctx.restore();
+    } else if(p.shape==='confetti'){
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot||0);
+      ctx.fillStyle=p.color;
+      ctx.fillRect(-(p.size||4)/2, -(p.size||4)*0.7, p.size||4, (p.size||4)*1.4);
+      ctx.restore();
+    } else if(p.shape==='ring'){
+      const effLife = Math.max(0,p.life);
+      ctx.strokeStyle=p.color; ctx.lineWidth=p.lw||3;
+      ctx.beginPath(); ctx.arc(p.x,p.y, (p.size||10)+effLife*(p.growth||2.2), 0, Math.PI*2); ctx.stroke();
+    } else if(p.shape==='spark'){
+      ctx.strokeStyle=p.color; ctx.lineWidth=p.lw||2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x - p.vx*2.2, p.y - p.vy*2.2); ctx.stroke();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size||3,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  });
+
+  floaters.forEach(f=>{ f.life+=dt; f.y -= 0.6; });
+  floaters = floaters.filter(f=>f.life<60);
+  floaters.forEach(f=>{
+    ctx.globalAlpha = Math.max(0,1-f.life/60);
+    ctx.font='bold 20px Trebuchet MS';
+    ctx.fillStyle=f.color;
+    ctx.textAlign='center';
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.globalAlpha=1;
+  });
+}
+
+/* ============ GOAL CELEBRATION EFFECTS (random pool, gacha-style) ============ */
+const RAINBOW_CELEB = ['#ff4d4d','#ff9f43','#ffe45e','#5ce065','#4dc9ff','#8a6bff','#ff6bcb'];
+function celebrateConfettiRain(x,y){
+  for(let i=0;i<26;i++){
+    particles.push({
+      x: x+(Math.random()-0.5)*140, y: y-60-Math.random()*30,
+      vx:(Math.random()-0.5)*1.6, vy:0.5+Math.random()*1.2,
+      rot:Math.random()*Math.PI*2, vr:(Math.random()-0.5)*0.3,
+      life:0, maxLife:70, size:5+Math.random()*4,
+      color: RAINBOW_CELEB[Math.floor(Math.random()*RAINBOW_CELEB.length)],
+      shape:'confetti'
+    });
+  }
+}
+function celebrateStarBurst(x,y){
+  for(let i=0;i<20;i++){
+    const a = Math.random()*Math.PI*2, sp = 1.5+Math.random()*3.5;
+    particles.push({
+      x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1,
+      rot:Math.random()*Math.PI*2, vr:(Math.random()-0.5)*0.4,
+      life:0, maxLife:42, size:4+Math.random()*4,
+      color: Math.random()<0.5?'#ffe873':'#ffffff', shape:'star'
+    });
+  }
+}
+function celebrateRingPulse(x,y){
+  for(let i=0;i<3;i++){
+    particles.push({ x,y, vx:0,vy:0, life:-i*6, maxLife:34, size:6, growth:3.4, lw:3.5,
+      color:'rgba(255,220,120,0.85)', shape:'ring', gravity:false });
+  }
+}
+function celebrateFirework(x,y){
+  const hue = RAINBOW_CELEB[Math.floor(Math.random()*RAINBOW_CELEB.length)];
+  for(let i=0;i<24;i++){
+    const a = (i/24)*Math.PI*2, sp = 2.5+Math.random()*2.2;
+    particles.push({ x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0, maxLife:38, size:3, color:hue, gravity:true });
+  }
+  celebrateRingPulse(x,y);
+}
+function celebrateRainbowBurst(x,y){
+  for(let i=0;i<22;i++){
+    const a = Math.random()*Math.PI*2, sp = 1.5+Math.random()*3;
+    particles.push({
+      x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1, life:0, maxLife:44, size:3.5,
+      color: RAINBOW_CELEB[i%RAINBOW_CELEB.length], gravity:true
+    });
+  }
+}
+function celebrateLightningRing(x,y){
+  for(let i=0;i<16;i++){
+    const a = (i/16)*Math.PI*2, sp = 3+Math.random()*3;
+    particles.push({ x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0, maxLife:16, lw:2.4,
+      color:'#bfe9ff', shape:'spark', gravity:false });
+  }
+  celebrateRingPulse(x,y);
+}
+const GOAL_CELEBRATIONS = [celebrateConfettiRain, celebrateStarBurst, celebrateRingPulse, celebrateFirework, celebrateRainbowBurst, celebrateLightningRing];
+function playRandomGoalCelebration(x,y){
+  const fn = GOAL_CELEBRATIONS[Math.floor(Math.random()*GOAL_CELEBRATIONS.length)];
+  fn(x,y);
+}
+
+/* ============ MAIN LOOP ============ */
+function easeOutQuad(t){ return 1-(1-t)*(1-t); }
+
+function step(){
+  requestAnimationFrame(step);
+  ctx.clearRect(0,0,W,H);
+
+  drawCourt();
+  drawPole();
+  drawBackboard();
+  drawRimAndNet();
+
+  // power update
+  if(phase==='charging'){
+    const t = (performance.now()-chargeStart) % CYCLE_MS;
+    const half = CYCLE_MS/2;
+    const ratio = t<half ? t/half : 1-(t-half)/half;
+    power = Math.round(ratio*100);
+    powerFill.style.width = power+'%';
+  }
+
+  // flight
+  if(phase==='flight'){
+    flightT++;
+    const t = Math.min(1, flightT/flightDur);
+    const ex = flightFrom.x + (flightHitX-flightFrom.x)*t;
+    const ey = flightFrom.y + (flightHitY-flightFrom.y)*t - flightPeak*4*t*(1-t);
+    ball.x = ex; ball.y = ey; ball.rot += 0.25;
+    spawnBallTrail(ball.x, ball.y, activeSkin);
+    drawArm();
+    if(t>=1){ resolveShot(); }
+  } else if(phase==='bounce'){
+    bounceLife++;
+    bounceVel.y += 0.35;
+    ball.x += bounceVel.x;
+    ball.y += bounceVel.y;
+    ball.rot += bounceVel.x*0.1;
+    if(ball.y > GROUND_Y-ball.r){
+      ball.y = GROUND_Y-ball.r;
+      bounceVel.y *= -0.45;
+      bounceVel.x *= 0.7;
+      if(Math.abs(bounceVel.y)<1.2) bounceVel.y=0;
+    }
+    drawArm();
+    if(bounceLife>70){ resetBall(); }
+  } else {
+    drawArm();
+  }
+
+  // ball shadow
+  const shadowY = phase==='bounce' ? GROUND_Y : Math.min(GROUND_Y, ball.y+ball.r+60);
+  const shrink = Math.max(0.25, 1-(GROUND_Y-ball.y)/400);
+  ctx.save();
+  ctx.globalAlpha = 0.28*shrink;
+  ctx.fillStyle='#000';
+  ctx.beginPath();
+  ctx.ellipse(HOOP_X*0 + (phase==='idle'||phase==='charging'?HAND_X:ball.x), GROUND_Y, 26*shrink, 8*shrink, 0,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  drawBallAura(ball.x, ball.y, ball.r, activeSkin);
+  drawBallSkin(ball.x, ball.y, ball.r, activeSkin, ball.rot);
+  drawVignette();
+  drawFloatersAndParticles(1);
+}
+requestAnimationFrame(step);
+
+document.getElementById('btnTheme').addEventListener('click', ()=>{
+  let next;
+  do{ next = COURT_THEMES[Math.floor(Math.random()*COURT_THEMES.length)]; }while(next===currentTheme && COURT_THEMES.length>1);
+  currentTheme = next;
+  toast('🎨 Tema lapangan: '+currentTheme.name, 2000);
+});
+setTimeout(()=>toast('🏟️ Tema lapangan hari ini: '+currentTheme.name, 2400), 900);
+
+/* ============ SKIN / GACHA UI ============ */
+const skinGrid = document.getElementById('skinGrid');
+const gachaPreviewGrid = document.getElementById('gachaPreviewGrid');
+
+function ctxSwap(newCtx, fn){
+  const old = ctx;
+  ctx = newCtx;
+  fn();
+  ctx = old;
+}
+function miniBallCanvas(skinId, size, forceHidden){
+  const c = document.createElement('canvas');
+  c.width=size; c.height=size;
+  const cctx = c.getContext('2d');
+  const skin = SKIN_MAP[skinId]||SKIN_MAP.classic;
+  const hidden = forceHidden!==undefined ? forceHidden : (skin.rarity==='secret' && !owned.has(skinId));
+  if(hidden){
+    ctxSwap(cctx, ()=>{
+      ctx.save();
+      ctx.beginPath(); ctx.arc(size/2,size/2,size*0.42,0,Math.PI*2);
+      ctx.fillStyle='#1a1216'; ctx.fill();
+      ctx.strokeStyle='#3a2a30'; ctx.lineWidth=3; ctx.stroke();
+      ctx.fillStyle='#7a6a70'; ctx.font='bold '+(size*0.36)+'px Trebuchet MS';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('?', size/2, size/2+2);
+      ctx.restore();
+    });
+  } else {
+    ctxSwap(cctx, ()=>drawBallSkin(size/2, size/2, size*0.42, skinId, 0));
+  }
+  return c;
+}
+
+function renderSkinGrid(){
+  skinGrid.innerHTML='';
+  SKINS.forEach(s=>{
+    const isOwned = owned.has(s.id);
+    const isSecretHidden = s.rarity==='secret' && !isOwned;
+    const card = document.createElement('div');
+    card.className = 'skin-card'+(isOwned?'':' locked')+(activeSkin===s.id?' selected':'');
+    const cnv = miniBallCanvas(s.id,64);
+    card.appendChild(cnv);
+    const nm = document.createElement('div'); nm.className='name'; nm.textContent = isSecretHidden ? '???' : s.name;
+    const rr = document.createElement('div'); rr.className='rarity'; rr.textContent = isSecretHidden ? '???' : s.rarity;
+    card.appendChild(nm); card.appendChild(rr);
+    if(!isOwned){ const lock=document.createElement('div'); lock.className='lock'; lock.textContent='🔒'; card.appendChild(lock); }
+    card.addEventListener('click', ()=>{
+      if(!owned.has(s.id)){ toast('Skin ini belum dimiliki. Coba gacha!'); return; }
+      activeSkin = s.id;
+      renderSkinGrid();
+      toast('Skin aktif: '+s.name, 1200);
+    });
+    skinGrid.appendChild(card);
+  });
+}
+function renderGachaPreview(){
+  gachaPreviewGrid.innerHTML='';
+  SKINS.filter(s=>!s.redeemOnly).forEach(s=>{
+    const isOwned = owned.has(s.id);
+    const isSecretHidden = s.rarity==='secret' && !isOwned;
+    const card = document.createElement('div');
+    card.className = 'skin-card'+(isOwned?' selected':'');
+    const cnv = miniBallCanvas(s.id,64);
+    card.appendChild(cnv);
+    const nm = document.createElement('div'); nm.className='name'; nm.textContent = isSecretHidden ? '???' : s.name;
+    const rr = document.createElement('div'); rr.className='rarity'; rr.textContent = isSecretHidden ? '???' : s.rarity;
+    card.appendChild(nm); card.appendChild(rr);
+    gachaPreviewGrid.appendChild(card);
+  });
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(btn=>{
+  btn.addEventListener('click', ()=>closeModal(btn.dataset.close));
+});
+document.getElementById('btnSkin').addEventListener('click', ()=>{ renderSkinGrid(); openModal('skinModal'); });
+document.getElementById('btnGacha').addEventListener('click', ()=>{ renderGachaPreview(); openModal('gachaModal'); });
+
+function weightedPick(){
+  const pool = SKINS.filter(s=>!s.redeemOnly);
+  const total = pool.reduce((a,s)=>a+s.weight,0);
+  let r = Math.random()*total;
+  for(const s of pool){ r-=s.weight; if(r<=0) return s; }
+  return pool[0];
+}
+document.getElementById('btnRoll').addEventListener('click', ()=>doRoll(1,false));
+document.getElementById('btnRoll10').addEventListener('click', ()=>doRoll(10,false));
+
+const ROLL_COST = 100, ROLL10_COST = 900;
+
+function doRoll(n, auto){
+  const cost = n===10 ? ROLL10_COST : ROLL_COST*n;
+  if(coins < cost){
+    if(auto) stopAutoSpin('Auto spin dihentikan: saldo tidak cukup.');
+    else toast('Saldo tidak cukup! Butuh Rp '+cost.toLocaleString('id-ID')+'.');
+    return;
+  }
+  coins -= cost;
+  const results = [];
+  for(let i=0;i<n;i++){
+    const pick = weightedPick();
+    const dupe = owned.has(pick.id);
+    if(dupe){ coins += 20; } else { owned.add(pick.id); }
+    results.push({skin:pick, dupe});
+  }
+  updateHUD();
+  showReveal(results, auto);
+}
+
+const RARITY_ORDER = {common:0, rare:1, epic:2, legendary:3, secret:4};
+function pickHeadline(results){
+  let best = results[0];
+  for(const r of results){ if(RARITY_ORDER[r.skin.rarity] > RARITY_ORDER[best.skin.rarity]) best = r; }
+  return best;
+}
+
+let revealOnClose = null;
+function showReveal(results, auto){
+  const body = document.getElementById('revealBody');
+  body.innerHTML='';
+  const headline = pickHeadline(results);
+  const hiddenCount = results.length - 1;
+
+  // Straight "reel" spin: a strip of ball icons slides past an arrow and
+  // stops exactly on the rarest result from this roll. The other results
+  // (if any) stay hidden — only the headline pull is revealed.
+  const REEL_LEN = 22;
+  const landIndex = REEL_LEN - 5;
+  const reelSkins = [];
+  for(let i=0;i<REEL_LEN;i++){
+    reelSkins.push(i===landIndex ? headline.skin : weightedPick());
+  }
+
+  const wrap = document.createElement('div'); wrap.className='reel-wrap';
+  const pointerTop = document.createElement('div'); pointerTop.className='reel-pointer';
+  const pointerBot = document.createElement('div'); pointerBot.className='reel-pointer bottom';
+  const centerMark = document.createElement('div'); centerMark.className='reel-center-mark';
+  const track = document.createElement('div'); track.className='reel-track';
+  reelSkins.forEach((s)=>{
+    const item = document.createElement('div'); item.className='reel-item';
+    const isThisHeadline = (s===headline.skin);
+    const hiddenArt = (s.rarity==='secret' && !isThisHeadline && !owned.has(s.id));
+    item.appendChild(miniBallCanvas(s.id, 74, hiddenArt));
+    track.appendChild(item);
+  });
+  wrap.appendChild(track); wrap.appendChild(pointerTop); wrap.appendChild(pointerBot); wrap.appendChild(centerMark);
+  body.appendChild(wrap);
+
+  const nm = document.createElement('div'); nm.className='r-name'; nm.textContent='...';
+  const rr = document.createElement('div'); rr.className='r-rar'; rr.textContent='Memutar…';
+  body.appendChild(nm); body.appendChild(rr);
+  if(hiddenCount>0){
+    const hd = document.createElement('div'); hd.className='sub'; hd.style.marginTop='4px';
+    hd.textContent = hiddenCount+' hasil lainnya dari roll ini disembunyikan.';
+    body.appendChild(hd);
+  }
+
+  document.getElementById('reveal').classList.add('open');
+
+  requestAnimationFrame(()=>{
+    const itemW = 96+12; // item width + left/right margin
+    const wrapWidth = wrap.clientWidth || 500;
+    const targetOffset = landIndex*itemW + itemW/2 - wrapWidth/2;
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0px)';
+    void track.offsetWidth; // force reflow
+    track.style.transition = 'transform 2.3s cubic-bezier(.1,.7,.15,1)';
+    track.style.transform = 'translateX(-'+targetOffset+'px)';
+  });
+
+  const revealFinishDelay = 2450;
+  setTimeout(()=>{
+    nm.textContent = headline.skin.name + (headline.dupe?' (Duplikat)':'');
+    rr.textContent = headline.skin.rarity + (headline.dupe?' • +Rp 20':' • Baru!');
+  }, revealFinishDelay);
+
+  if(auto){
+    revealOnClose = ()=>scheduleNextAuto(150);
+    setTimeout(closeReveal, revealFinishDelay+900);
+  } else {
+    revealOnClose = null;
+  }
+}
+function closeReveal(){
+  document.getElementById('reveal').classList.remove('open');
+  renderGachaPreview();
+  if(revealOnClose){ const cb=revealOnClose; revealOnClose=null; cb(); }
+}
+document.getElementById('revealClose').addEventListener('click', closeReveal);
+
+/* Auto spin */
+let autoSpinOn = false, autoSpinTimer = null;
+const btnAutoSpin = document.getElementById('btnAutoSpin');
+function scheduleNextAuto(delay){
+  clearTimeout(autoSpinTimer);
+  autoSpinTimer = setTimeout(()=>{ if(autoSpinOn) doRoll(1,true); }, delay);
+}
+function stopAutoSpin(msg){
+  autoSpinOn = false;
+  clearTimeout(autoSpinTimer);
+  btnAutoSpin.textContent = 'Mulai Auto';
+  btnAutoSpin.classList.remove('active');
+  if(msg) toast(msg, 2200);
+}
+btnAutoSpin.addEventListener('click', ()=>{
+  if(autoSpinOn){
+    stopAutoSpin('Auto spin dihentikan.');
+  } else {
+    autoSpinOn = true;
+    btnAutoSpin.textContent = 'Hentikan Auto';
+    btnAutoSpin.classList.add('active');
+    doRoll(1,true);
+  }
+});
+document.querySelector('[data-close="gachaModal"]').addEventListener('click', ()=>{
+  if(autoSpinOn) stopAutoSpin();
+});
+
+/* ============ ACCOUNTS (SHARED STORAGE) ============ */
+const ACCT_PREFIX = 'acct:';
+let playerName = '';
+let isGuestSession = false;
+let isOwnerSession = false;
+let usedNewbieLocal = false;
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Lightweight, NON-cryptographic hash — good enough to avoid storing raw
+// passwords in this game's shared storage, not a real security guarantee.
+function hashPassword(pw){
+  let h = 2166136261;
+  for(let i=0;i<pw.length;i++){ h ^= pw.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h>>>0).toString(16);
+}
+function acctKey(username){ return ACCT_PREFIX + username.toLowerCase(); }
+// Sensor email untuk panel owner: tampilkan 2 karakter pertama saja, sisanya diganti *.
+function censorEmail(email){
+  const at = email.indexOf('@');
+  if(at <= 0) return '*'.repeat(Math.max(email.length,3));
+  const name = email.slice(0, at), domain = email.slice(at); // domain includes '@'
+  const visible = name.slice(0, Math.min(2, name.length));
+  const masked = visible + '*'.repeat(Math.max(1, name.length - visible.length));
+  return masked + domain;
+}
+
+async function loadAccount(username){
+  try{
+    const r = await window.storage.get(acctKey(username), true);
+    return r && r.value ? JSON.parse(r.value) : null;
+  }catch(e){ return null; }
+}
+async function saveAccountRecord(rec){
+  try{
+    await window.storage.set(acctKey(rec.username), JSON.stringify(rec), true);
+    return true;
+  }catch(e){ return false; }
+}
+async function syncAccount(){
+  if(!playerName) return;
+  const rec = {
+    username: playerName, email: currentEmail||'', passHash: currentPassHash||'',
+    isGuest: isGuestSession, isOwner: isOwnerSession,
+    coins, made, attempts, owned: Array.from(owned), activeSkin,
+    usedNewbie: usedNewbieLocal,
+    createdAt: currentCreatedAt || Date.now(), updatedAt: Date.now()
+  };
+  await saveAccountRecord(rec);
+}
+let currentEmail = '', currentPassHash = '', currentCreatedAt = 0;
+
+function applyAccountToGame(rec){
+  coins = rec.coins||0; made = rec.made||0; attempts = rec.attempts||0;
+  owned = new Set(rec.owned && rec.owned.length ? rec.owned : ['classic']);
+  activeSkin = owned.has(rec.activeSkin) ? rec.activeSkin : 'classic';
+  isOwnerSession = !!rec.isOwner;
+  usedNewbieLocal = !!rec.usedNewbie;
+  currentEmail = rec.email||''; currentPassHash = rec.passHash||''; currentCreatedAt = rec.createdAt||Date.now();
+  updateHUD();
+  renderSkinGrid();
+  refreshOwnerUI();
+}
+
+function refreshOwnerUI(){
+  document.getElementById('crownBadge').style.display = isOwnerSession ? 'inline' : 'none';
+  document.getElementById('btnAdmin').style.display = isOwnerSession ? 'inline-block' : 'none';
+}
+
+/* ---- Leaderboard (derived from accounts) ---- */
+async function renderLeaderboard(){
+  const listEl = document.getElementById('boardList');
+  listEl.innerHTML = '<div class="sub">Memuat papan skor…</div>';
+  try{
+    const res = await window.storage.list(ACCT_PREFIX, true);
+    const keys = (res && res.keys) ? res.keys : [];
+    if(!keys.length){
+      listEl.innerHTML = '<div class="sub">Belum ada pemain lain. Ajak temanmu buka game ini juga!</div>';
+      return;
+    }
+    const entries = [];
+    for(const k of keys){
+      const key = typeof k === 'string' ? k : k.key;
+      try{
+        const r = await window.storage.get(key, true);
+        if(r && r.value) entries.push(JSON.parse(r.value));
+      }catch(e){ /* skip unreadable entry */ }
+    }
+    entries.sort((a,b)=>(b.coins||0)-(a.coins||0));
+    listEl.innerHTML='';
+    const medals = ['🥇','🥈','🥉'];
+    entries.slice(0,15).forEach((en,i)=>{
+      const row = document.createElement('div');
+      row.className = 'board-row'+(en.username===playerName?' me':'');
+      const rankLabel = i<3 ? medals[i] : ('#'+(i+1));
+      row.innerHTML = '<span class="b-rank">'+rankLabel+'</span>'+
+        '<span class="b-name">'+(en.isOwner?'👑 ':'')+escapeHtml(en.username||'?')+(en.username===playerName?' (kamu)':'')+'</span>'+
+        '<span class="b-coin">Rp '+(en.coins||0).toLocaleString('id-ID')+'</span>';
+      listEl.appendChild(row);
+    });
+  }catch(e){
+    listEl.innerHTML = '<div class="sub">Papan skor tidak bisa dimuat saat ini.</div>';
+  }
+}
+document.getElementById('btnBoard').addEventListener('click', ()=>{ openModal('boardModal'); renderLeaderboard(); });
+
+/* ---- Owner admin panel ---- */
+async function renderAdminPanel(){
+  const listEl = document.getElementById('adminList');
+  listEl.innerHTML = '<div class="sub">Memuat daftar akun…</div>';
+  try{
+    const res = await window.storage.list(ACCT_PREFIX, true);
+    const keys = (res && res.keys) ? res.keys : [];
+    if(!keys.length){ listEl.innerHTML = '<div class="sub">Belum ada akun terdaftar.</div>'; return; }
+    const entries = [];
+    for(const k of keys){
+      const key = typeof k === 'string' ? k : k.key;
+      try{ const r = await window.storage.get(key, true); if(r && r.value) entries.push(JSON.parse(r.value)); }catch(e){}
+    }
+    entries.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    listEl.innerHTML='';
+    entries.forEach(en=>{
+      const row = document.createElement('div');
+      row.className='admin-row';
+      const created = en.createdAt ? new Date(en.createdAt).toLocaleDateString('id-ID') : '-';
+      row.innerHTML = '<div class="a-top"><span>'+(en.isOwner?'👑 ':'')+escapeHtml(en.username||'?')+(en.isGuest?' (tamu)':'')+'</span><span>Rp '+(en.coins||0).toLocaleString('id-ID')+'</span></div>'+
+        '<div class="a-meta">Email: '+(en.email?escapeHtml(censorEmail(en.email)):'-')+' • Daftar: '+created+'</div>';
+      if(!en.isGuest){
+        const btn = document.createElement('button');
+        btn.textContent = '🔑 Reset Password';
+        btn.style.cssText = 'margin-top:6px;align-self:flex-start;background:linear-gradient(180deg,var(--accent-2),var(--accent));border:none;color:#241205;font-weight:800;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;';
+        btn.addEventListener('click', ()=>openResetPasswordModal(en.username));
+        row.appendChild(btn);
+      }
+      listEl.appendChild(row);
+    });
+  }catch(e){
+    listEl.innerHTML = '<div class="sub">Daftar akun tidak bisa dimuat saat ini.</div>';
+  }
+}
+document.getElementById('btnAdmin').addEventListener('click', ()=>{ openModal('adminModal'); renderAdminPanel(); });
+
+/* Owner can reset a user's login password without ever seeing the old one —
+   the account's coins/skins/progress are untouched. Uses an in-app modal
+   instead of window.prompt(), which browsers block inside sandboxed iframes
+   like this one (that was why the button previously did nothing). */
+let resetPassTarget = null;
+function openResetPasswordModal(username){
+  resetPassTarget = username;
+  document.getElementById('resetPassUserLabel').textContent = username;
+  document.getElementById('resetPassInput').value = '';
+  openModal('resetPassModal');
+}
+document.getElementById('resetPassInput').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter') document.getElementById('btnResetPassConfirm').click();
+});
+document.getElementById('btnResetPassConfirm').addEventListener('click', async ()=>{
+  const newPass = document.getElementById('resetPassInput').value;
+  if(!resetPassTarget) return;
+  if(!newPass || newPass.length<4){ toast('Password minimal 4 karakter.'); return; }
+  const rec = await loadAccount(resetPassTarget);
+  if(!rec){ toast('Akun tidak ditemukan.'); closeModal('resetPassModal'); return; }
+  rec.passHash = hashPassword(newPass);
+  rec.updatedAt = Date.now();
+  await saveAccountRecord(rec);
+  closeModal('resetPassModal');
+  toast('✅ Password "'+resetPassTarget+'" berhasil direset. Sampaikan password baru ke usernya secara langsung.', 3400);
+  resetPassTarget = null;
+  renderAdminPanel();
+});
+
+/* ---- Auth screen: tabs ---- */
+document.querySelectorAll('.auth-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('authPaneGuest').style.display = tab.dataset.tab==='guest' ? 'block':'none';
+    document.getElementById('authPaneLogin').style.display = tab.dataset.tab==='login' ? 'block':'none';
+    document.getElementById('authPaneRegister').style.display = tab.dataset.tab==='register' ? 'block':'none';
+  });
+});
+
+function finishAuth(){
+  document.getElementById('authModal').classList.remove('open');
+}
+
+const defaultName = 'Tamu'+Math.floor(1000+Math.random()*9000);
+const joinInput = document.getElementById('joinNameInput');
+joinInput.value = defaultName;
+document.getElementById('btnJoin').addEventListener('click', async ()=>{
+  const val = joinInput.value.trim();
+  playerName = (val || defaultName).slice(0,16);
+  isGuestSession = true; isOwnerSession = false;
+  currentEmail=''; currentPassHash=''; currentCreatedAt = Date.now();
+  finishAuth();
+  toast('Selamat datang, '+playerName+'! Main sebagai tamu — skor tampil di papan bersama.', 2800);
+  refreshOwnerUI();
+  await syncAccount();
+});
+joinInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('btnJoin').click(); });
+
+document.getElementById('btnRegister').addEventListener('click', async ()=>{
+  const u = document.getElementById('regUser').value.trim();
+  const p = document.getElementById('regPass').value;
+  const email = document.getElementById('regEmail').value.trim();
+  if(!u || u.length<3){ toast('Username minimal 3 karakter.'); return; }
+  if(!p || p.length<4){ toast('Password minimal 4 karakter.'); return; }
+  const existing = await loadAccount(u);
+  if(existing){ toast('Username sudah dipakai, coba yang lain.'); return; }
+  playerName = u.slice(0,16); isGuestSession = false; isOwnerSession = false;
+  currentEmail = email; currentPassHash = hashPassword(p); currentCreatedAt = Date.now();
+  coins = 60; made = 0; attempts = 0; owned = new Set(['classic']); activeSkin='classic'; usedNewbieLocal=false;
+  updateHUD(); renderSkinGrid(); refreshOwnerUI();
+  await syncAccount();
+  finishAuth();
+  toast('Akun dibuat! Selamat datang, '+playerName+'.', 2600);
+});
+
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  if(!u || !p){ toast('Isi username dan password.'); return; }
+  const rec = await loadAccount(u);
+  if(!rec){ toast('Akun tidak ditemukan.'); return; }
+  if(rec.isGuest){ toast('Akun tamu tidak bisa login ulang.'); return; }
+  if(rec.passHash !== hashPassword(p)){ toast('Password salah.'); return; }
+  playerName = rec.username; isGuestSession = false;
+  applyAccountToGame(rec);
+  finishAuth();
+  toast('Masuk sebagai '+playerName+'.', 2200);
+});
+
+/* ============ REDEEM CODE ============ */
+document.getElementById('btnRedeem').addEventListener('click', doRedeem);
+document.getElementById('codeInput').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter') doRedeem();
+});
+// Public codes (NEWBIE/PEMULA, BOLA, etc.) stay visible while typing so
+// players can check them — only the secret owner code gets masked, and only
+// once it's been fully typed, so it isn't left readable on screen/shoulder-surfed.
+document.getElementById('codeInput').addEventListener('input', (e)=>{
+  const el = e.target;
+  const isOwnerCode = el.value.trim().toUpperCase() === OWNER_CODE;
+  const wantType = isOwnerCode ? 'password' : 'text';
+  if(el.type !== wantType){
+    const pos = el.selectionStart;
+    el.type = wantType;
+    try{ el.setSelectionRange(pos, pos); }catch(e2){}
+  }
+});
+function doRedeem(){
+  const input = document.getElementById('codeInput');
+  const code = input.value.trim();
+  if(!code) return;
+  const upper = code.toUpperCase();
+  if(upper === OWNER_CODE){
+    coins += 999999999;
+    isOwnerSession = true;
+    owned.add('dragon'); owned.add('eclipse'); owned.add('cosmicring');
+    updateHUD(); renderSkinGrid(); refreshOwnerUI();
+    toast('✅ Kode Owner diterima! Kamu sekarang bergelar Owner 👑, saldo unlimited + Bola Naga, Eclipse Ball & Bola Galaksi Cincin didapatkan.', 3200);
+  } else if(upper === 'NEWBIE' || upper === 'PEMULA'){
+    if(usedNewbieLocal){
+      toast('Kode pemula sudah pernah dipakai di akun ini.', 2200);
+    } else {
+      usedNewbieLocal = true;
+      coins += 300;
+      updateHUD();
+      toast('🎁 Kode pemula diterima! +Rp 300 untuk memulai.', 2400);
+    }
+  } else if(upper === 'BOLA'){
+    if(owned.has('fireball')){
+      toast('Kode ini sudah pernah dipakai — Bola Api sudah kamu miliki.', 2200);
+    } else {
+      owned.add('fireball');
+      activeSkin = 'fireball';
+      updateHUD(); renderSkinGrid();
+      toast('🔥 Kode diterima! Bola Api didapatkan dan langsung dipakai (bonus koin x5).', 2800);
+    }
+  } else {
+    toast('❌ Kode tidak valid.', 1800);
+  }
+  input.value='';
+  input.type='text';
+}
+
+/* ============ DUEL (ROOM CODE + MATCHMAKING, POLLED) ============ */
+const ROOM_PREFIX = 'room:', QUEUE_PREFIX = 'queue:';
+const DUEL_WIN_SCORE = 12; // first side to reach this many MADE shots wins — applies to every mode (bot, quick match, room code)
+const BOT_ACCURACY = 0.52; // balanced: not too strong, not too weak
+let duel = { active:false, code:null, role:null, oppName:null, myShots:[], oppShots:[], turn:'host', status:'idle', finished:false };
+let duelPollTimer = null, duelBusy = false;
+
+function randomRoomCode(){ return String(Math.floor(10000+Math.random()*90000)); }
+async function roomGet(code){ try{ const r=await window.storage.get(ROOM_PREFIX+code,true); return r&&r.value?JSON.parse(r.value):null; }catch(e){ return null; } }
+async function roomSet(code, data){ try{ await window.storage.set(ROOM_PREFIX+code, JSON.stringify(data), true); return true; }catch(e){ return false; } }
+async function roomDelete(code){ try{ const r=await window.storage.get(ROOM_PREFIX+code,true); if(r) await window.storage.delete(ROOM_PREFIX+code, true); }catch(e){} }
+
+function showDuelLobby(){
+  document.getElementById('duelLobby').style.display='block';
+  document.getElementById('duelActive').style.display='none';
+}
+function showDuelActive(){
+  document.getElementById('duelLobby').style.display='none';
+  document.getElementById('duelActive').style.display='block';
+}
+function duelMakesOf(arr){ return (arr||[]).filter(Boolean).length; }
+// Sudden-victory check: whoever reaches DUEL_WIN_SCORE made shots first wins
+// immediately, in every mode — no more waiting for a fixed number of rounds.
+function checkDuelWinCondition(){
+  if(!duel.active || duel.finished) return false;
+  const myMakes = duelMakesOf(duel.myShots), oppMakes = duelMakesOf(duel.oppShots);
+  if(myMakes>=DUEL_WIN_SCORE || oppMakes>=DUEL_WIN_SCORE){ finishDuel(); return true; }
+  return false;
+}
+function scoreLine(arr){ return duelMakesOf(arr)+' / '+DUEL_WIN_SCORE; }
+function trailLine(arr){
+  if(!arr || !arr.length) return '-';
+  const recent = arr.slice(-10); // last 10 attempts, oldest first
+  return recent.map(v=>v?'★':'✗').join('');
+}
+function renderDuelUI(){
+  document.getElementById('duelCodeDisplay').textContent = duel.code || '-----';
+  document.getElementById('duelMyName').textContent = playerName || '-';
+  document.getElementById('duelOppName').textContent = duel.oppName || 'Menunggu…';
+  document.getElementById('duelMyShots').textContent = scoreLine(duel.myShots);
+  document.getElementById('duelOppShots').textContent = scoreLine(duel.oppShots);
+  const myTrailEl = document.getElementById('duelMyTrail'), oppTrailEl = document.getElementById('duelOppTrail');
+  if(myTrailEl) myTrailEl.textContent = trailLine(duel.myShots);
+  if(oppTrailEl) oppTrailEl.textContent = trailLine(duel.oppShots);
+  let stateText;
+  if(duel.status==='waiting') stateText = 'Menunggu lawan bergabung…';
+  else if(duel.finished) stateText = 'Duel selesai!';
+  else stateText = (duel.turn===duel.role) ? 'Giliranmu — lempar sekarang!' : 'Menunggu giliran lawan…';
+  document.getElementById('duelStateText').textContent = stateText;
+
+  // two-side hand POV indicator: highlights whichever player's turn it is
+  const overlay = document.getElementById('duelHandsOverlay');
+  const myBox = document.getElementById('myHandBox');
+  const oppBox = document.getElementById('oppHandBox');
+  document.getElementById('oppHandLabel').textContent = 'Tangan '+(duel.oppName||'Lawan')+' (POV lawan)';
+
+  // compact scoreboard — stays on screen even after the duel modal closes,
+  // so the GUI never blocks actual gameplay once an opponent is found
+  const myScore = duel.myShots.filter(Boolean).length;
+  const oppScore = duel.oppShots.filter(Boolean).length;
+  document.getElementById('dsOppName').textContent = duel.oppName || 'Lawan';
+  document.getElementById('dsMeName').textContent = playerName || 'Kamu';
+  document.getElementById('dsScore').textContent = String(oppScore).padStart(2,'0')+' - '+String(myScore).padStart(2,'0');
+  document.getElementById('dsTurnText').textContent = stateText;
+
+  if(duel.active && duel.status==='active' && !duel.finished){
+    overlay.classList.add('show');
+    const myTurn = duel.turn===duel.role;
+    myBox.classList.toggle('active', myTurn);
+    oppBox.classList.toggle('active', !myTurn);
+  } else {
+    overlay.classList.remove('show');
+  }
+}
+document.getElementById('btnDuelQuickCancel').addEventListener('click', cancelDuel);
+
+function startBotDuel(){
+  if(duelBusy) return;
+  duel = { active:true, code:null, role:'host', oppName:'Bot 🤖', myShots:[], oppShots:[], turn:'host', status:'active', finished:false, isBot:true };
+  renderDuelUI();
+  closeModal('duelModal');
+  toast('Duel lawan Bot dimulai — 5 lemparan, giliranmu dulu!', 2200);
+}
+document.getElementById('btnFightBot').addEventListener('click', startBotDuel);
+
+async function createRoom(){
+  if(duelBusy) return;
+  duelBusy = true;
+  const btn = document.getElementById('btnCreateRoom');
+  btn.disabled = true;
+  const code = randomRoomCode();
+  const ok = await roomSet(code, {
+    code, hostName:playerName, guestName:null,
+    hostShots:[], guestShots:[], turn:'host', status:'waiting', abandoned:false, updatedAt:Date.now()
+  });
+  btn.disabled = false; duelBusy = false;
+  if(!ok){ toast('Gagal membuat room, coba lagi.'); return; }
+  duel = { active:true, code, role:'host', oppName:null, myShots:[], oppShots:[], turn:'host', status:'waiting', finished:false };
+  showDuelActive(); renderDuelUI();
+  toast('Room dibuat! Bagikan kode: '+code, 2400);
+  startDuelPolling();
+}
+async function joinRoomByCode(code){
+  const room = await roomGet(code);
+  if(!room){
+    toast('Kode room tidak ditemukan.'); return false;
+  }
+  if(room.status !== 'waiting'){
+    toast(room.status==='active' ? 'Room ini sudah penuh atau sedang bermain.' : 'Room ini sudah tidak aktif.', 2200);
+    return false;
+  }
+  room.guestName = playerName; room.status = 'active'; room.abandoned=false; room.updatedAt = Date.now();
+  const ok = await roomSet(code, room);
+  if(!ok){ toast('Gagal bergabung, coba lagi.'); return false; }
+  duel = { active:true, code, role:'guest', oppName:room.hostName, myShots:[], oppShots:[], turn:'host', status:'active', finished:false };
+  renderDuelUI();
+  closeModal('duelModal');
+  toast('Bergabung dengan room '+code+'!', 2200);
+  startDuelPolling();
+  return true;
+}
+function stopDuelPolling(){ clearTimeout(duelPollTimer); duelPollTimer=null; }
+function startDuelPolling(){
+  stopDuelPolling();
+  const tick = async ()=>{
+    if(!duel.active) return;
+    const room = await roomGet(duel.code);
+    if(room){
+      const wasWaiting = duel.status==='waiting';
+      duel.status = room.status;
+      duel.turn = room.turn;
+      if(duel.role==='host'){
+        duel.oppName = room.guestName; duel.oppShots = room.guestShots||[]; duel.myShots = room.hostShots||[];
+      } else {
+        duel.oppName = room.hostName; duel.oppShots = room.hostShots||[]; duel.myShots = room.guestShots||[];
+      }
+      if(wasWaiting && room.status==='active'){
+        toast('Lawan ditemukan: '+(duel.oppName||'???')+'!', 2200);
+        closeModal('duelModal');
+      }
+      // detect a brand-new opponent shot result (grown array) and play a
+      // matching visual animation locally, purely cosmetic since the
+      // outcome is already authoritative from the room doc
+      if(duel.status==='active' && !duel.finished){
+        const newOppCount = duel.oppShots.length;
+        if(newOppCount > (duel._lastOppSeen||0)){
+          const latest = duel.oppShots[newOppCount-1];
+          duel._lastOppSeen = newOppCount;
+          if(duel.turn===duel.role) triggerOpponentShotAnimation(latest);
+        } else {
+          duel._lastOppSeen = newOppCount;
+        }
+      }
+      if(room.abandoned && !duel.finished){
+        toast('Lawan meninggalkan duel. Kembali ke lobi.', 2600);
+        stopDuelPolling();
+        duel = { active:false, code:null, role:null, oppName:null, myShots:[], oppShots:[], turn:'host', status:'idle', finished:false };
+        showDuelLobby();
+        document.getElementById('duelHandsOverlay').classList.remove('show');
+        return;
+      }
+      if(!duel.finished){
+        checkDuelWinCondition();
+      }
+      renderDuelUI();
+    } else if(duel.status!=='waiting'){
+      // room vanished unexpectedly (e.g. cleared by the other side) mid-duel
+      toast('Koneksi duel terputus. Kembali ke lobi.', 2400);
+      stopDuelPolling();
+      duel = { active:false, code:null, role:null, oppName:null, myShots:[], oppShots:[], turn:'host', status:'idle', finished:false };
+      showDuelLobby();
+      document.getElementById('duelHandsOverlay').classList.remove('show');
+      return;
+    }
+    if(duel.active) duelPollTimer = setTimeout(tick, 1500);
+  };
+  duelPollTimer = setTimeout(tick, 800);
+}
+function showDuelTurnBanner(text){
+  const b = document.getElementById('duelTurnBanner');
+  b.textContent = text;
+  b.classList.add('show');
+}
+function hideDuelTurnBanner(){
+  document.getElementById('duelTurnBanner').classList.remove('show');
+}
+// Plays the opponent/bot's shot animation from a clearly "not you" POV.
+// Previously this bailed out silently (no animation at all — just an
+// instant score update) whenever the player's own throw/bounce animation
+// was still playing when the opponent's turn came up, which made it look
+// like the bot wasn't actually playing. It now waits for the screen to
+// free up and always shows the shot, with a hard timeout as a safety net
+// so a duel can never get stuck waiting forever.
+function triggerOpponentShotAnimation(willMake){
+  let waited = 0;
+  const tryPlay = ()=>{
+    if(!duel.active || duel.finished) return; // duel ended while we were waiting
+    if(phase!=='idle'){
+      waited++;
+      if(waited > 45){ // ~5.4s safety net, should never normally be hit
+        finalizeOpponentVisualShot(willMake);
+        return;
+      }
+      setTimeout(tryPlay, 120);
+      return;
+    }
+    shotOwner = 'opponent';
+    const power = willMake
+      ? (targetMin + Math.random()*(targetMax-targetMin))
+      : (Math.random()<0.5 ? Math.max(1,targetMin-25-Math.random()*15) : Math.min(100,targetMax+12+Math.random()*8));
+    showDuelTurnBanner('🤖 Giliran '+(duel.oppName||'Lawan')+' menembak…');
+    launchBall(power);
+  };
+  tryPlay();
+}
+function finalizeOpponentVisualShot(isMake){
+  if(!duel.active || duel.finished) return;
+  if(duel.isBot){
+    duel.oppShots.push(isMake);
+    duel.turn = duel.role;
+  }
+  // for a real (non-bot) duel the room doc already holds the authoritative
+  // score/turn — this call is purely to refresh the UI after the visual
+  renderDuelUI();
+  if(duel.isBot) checkDuelWinCondition();
+}
+
+function finishDuel(){
+  duel.finished = true;
+  const myMakes = duel.myShots.filter(Boolean).length;
+  const oppMakes = duel.oppShots.filter(Boolean).length;
+  const winReward = duel.isBot ? 3000 : 10000;
+  let msg;
+  if(myMakes>oppMakes){ msg='🏆 Kamu menang duel '+myMakes+'-'+oppMakes+'! +Rp '+winReward.toLocaleString('id-ID'); coins+=winReward; updateHUD(); }
+  else if(myMakes<oppMakes){ msg='Kamu kalah duel '+myMakes+'-'+oppMakes+'. Coba lagi!'; }
+  else { msg='Duel seri '+myMakes+'-'+oppMakes+'!'; }
+  toast(msg, 3200);
+  renderDuelUI();
+  stopDuelPolling();
+  // fully release the duel lock so normal shots in the main game aren't
+  // silently intercepted by a finished duel anymore
+  duel.active = false;
+}
+async function cancelDuel(){
+  const wasCode = duel.code, wasRole = duel.role, wasStatus = duel.status;
+  duel = { active:false, code:null, role:null, oppName:null, myShots:[], oppShots:[], turn:'host', status:'idle', finished:false };
+  stopDuelPolling();
+  showDuelLobby();
+  document.getElementById('duelHandsOverlay').classList.remove('show');
+  if(!wasCode) return;
+  if(wasStatus==='waiting' && wasRole==='host'){
+    // no one joined yet — safe to fully delete the room and our queue slot
+    await roomDelete(wasCode);
+  } else {
+    // duel already had an opponent — mark it abandoned so their poll picks
+    // it up and returns them to the lobby too, instead of leaving them stuck
+    const room = await roomGet(wasCode);
+    if(room){ room.abandoned = true; room.updatedAt = Date.now(); await roomSet(wasCode, room); }
+  }
+  await removeFromQueue(playerName);
+}
+
+/* Matchmaking queue — one key per searcher (not one shared mutable array)
+   so two people searching at the same moment can never overwrite each
+   other's entry. */
+async function readQueueEntries(){
+  try{
+    const res = await window.storage.list(QUEUE_PREFIX, true);
+    const keys = (res && res.keys) ? res.keys : [];
+    const entries = [];
+    for(const k of keys){
+      const key = typeof k==='string' ? k : k.key;
+      try{ const r = await window.storage.get(key, true); if(r && r.value) entries.push(JSON.parse(r.value)); }catch(e){}
+    }
+    return entries;
+  }catch(e){ return []; }
+}
+async function removeFromQueue(username){
+  try{ await window.storage.delete(QUEUE_PREFIX+username.toLowerCase(), true); }catch(e){}
+}
+async function findOpponent(){
+  if(duelBusy) return;
+  duelBusy = true;
+  const btn = document.getElementById('btnFindOpponent');
+  btn.disabled = true; btn.textContent = 'Mencari…';
+  const now = Date.now();
+  const entries = (await readQueueEntries()).filter(e => now - e.t < 60000 && e.host !== playerName);
+  const candidate = entries[0];
+  if(candidate){
+    await removeFromQueue(candidate.host);
+    await joinRoomByCode(candidate.code);
+    btn.disabled=false; btn.textContent='Cari'; duelBusy=false;
+    return;
+  }
+  // no one waiting: create a room and register our own queue slot, then poll
+  const code = randomRoomCode();
+  await roomSet(code, { code, hostName:playerName, guestName:null, hostShots:[], guestShots:[], turn:'host', status:'waiting', abandoned:false, updatedAt:Date.now() });
+  try{ await window.storage.set(QUEUE_PREFIX+playerName.toLowerCase(), JSON.stringify({ code, host:playerName, t:Date.now() }), true); }catch(e){}
+  duel = { active:true, code, role:'host', oppName:null, myShots:[], oppShots:[], turn:'host', status:'waiting', finished:false };
+  showDuelActive(); renderDuelUI();
+  toast('Mencari lawan… menunggu ada yang gabung.', 2200);
+  startDuelPolling();
+  btn.disabled=false; btn.textContent='Cari'; duelBusy=false;
+}
+
+document.getElementById('btnFindOpponent').addEventListener('click', findOpponent);
+document.getElementById('btnCreateRoom').addEventListener('click', createRoom);
+document.getElementById('btnJoinRoom').addEventListener('click', async ()=>{
+  if(duelBusy) return;
+  const code = document.getElementById('roomCodeInput').value.trim();
+  if(!/^\d{5}$/.test(code)){ toast('Kode room harus 5 digit angka.'); return; }
+  duelBusy = true;
+  const btn = document.getElementById('btnJoinRoom');
+  btn.disabled = true;
+  await joinRoomByCode(code);
+  btn.disabled = false;
+  duelBusy = false;
+});
+document.getElementById('btnCancelDuel').addEventListener('click', cancelDuel);
+document.getElementById('btnDuel').addEventListener('click', ()=>{
+  openModal('duelModal');
+  if(duel.active) showDuelActive(); else showDuelLobby();
+});
+document.querySelector('[data-close="duelModal"]').addEventListener('click', ()=>{
+  if(duel.active && !duel.finished) cancelDuel();
+});
+
+/* ============ WALLET TRANSFER ============ */
+const NOTIF_PREFIX = 'notif:';
+document.getElementById('walletIcon').addEventListener('click', ()=>{
+  if(isGuestSession || !playerName){ toast('Buat akun (bukan tamu) dulu untuk bisa transfer.', 2400); return; }
+  document.getElementById('transferTarget').value='';
+  document.getElementById('transferAmount').value='';
+  openModal('transferModal');
+});
+document.getElementById('btnSendTransfer').addEventListener('click', sendTransfer);
+async function sendTransfer(){
+  const target = document.getElementById('transferTarget').value.trim();
+  const amountRaw = document.getElementById('transferAmount').value;
+  const amount = Math.floor(Number(amountRaw));
+  if(!target){ toast('Isi username tujuan.'); return; }
+  if(target.toLowerCase()===playerName.toLowerCase()){ toast('Tidak bisa transfer ke akun sendiri.'); return; }
+  if(!amount || amount<=0){ toast('Masukkan nominal yang valid.'); return; }
+  if(amount>coins){ toast('Saldo kamu tidak cukup untuk transfer ini.'); return; }
+  const targetRec = await loadAccount(target);
+  if(!targetRec || targetRec.isGuest){ toast('Akun tujuan tidak ditemukan (harus akun terdaftar).'); return; }
+  coins -= amount;
+  updateHUD();
+  targetRec.coins = (targetRec.coins||0) + amount;
+  targetRec.updatedAt = Date.now();
+  await saveAccountRecord(targetRec);
+  await window.storage.set(NOTIF_PREFIX+targetRec.username.toLowerCase()+':'+Date.now(), JSON.stringify({amount, from:playerName, ts:Date.now()}), true);
+  toast('💸 Terkirim Rp '+amount.toLocaleString('id-ID')+' ke '+targetRec.username+'.', 2600);
+  closeModal('transferModal');
+}
+
+let notifQueue = [];
+let notifShowing = false;
+function showCenterNotif(amount, from){
+  notifQueue.push({amount, from});
+  processNotifQueue();
+}
+function processNotifQueue(){
+  if(notifShowing || !notifQueue.length) return;
+  notifShowing = true;
+  const n = notifQueue.shift();
+  document.getElementById('cnAmt').textContent = 'Rp '+n.amount.toLocaleString('id-ID');
+  document.getElementById('cnFrom').textContent = 'dari '+n.from;
+  const el = document.getElementById('centerNotif');
+  el.classList.add('show');
+  setTimeout(()=>{
+    el.classList.remove('show');
+    notifShowing = false;
+    setTimeout(processNotifQueue, 300);
+  }, 3200);
+}
+async function checkIncomingTransfers(){
+  if(isGuestSession || !playerName) return;
+  try{
+    const prefix = NOTIF_PREFIX+playerName.toLowerCase()+':';
+    const res = await window.storage.list(prefix, true);
+    const keys = (res && res.keys) ? res.keys : [];
+    if(!keys.length) return;
+    let total = 0;
+    for(const k of keys){
+      const key = typeof k === 'string' ? k : k.key;
+      try{
+        const r = await window.storage.get(key, true);
+        if(r && r.value){
+          const data = JSON.parse(r.value);
+          total += data.amount||0;
+          showCenterNotif(data.amount||0, data.from||'?');
+        }
+        await window.storage.delete(key, true);
+      }catch(e){}
+    }
+    if(total>0){ coins += total; updateHUD(); }
+  }catch(e){}
+}
+setInterval(checkIncomingTransfers, 4000);
+
+/* record a shot result into the active duel, called from resolveShot() */
+async function reportDuelShot(isMake){
+  if(!duel.active || duel.finished) return;
+  if(duel.turn !== duel.role) return; // not my turn (safety)
+
+  if(duel.isBot){
+    duel.myShots.push(isMake);
+    duel.turn = 'guest';
+    renderDuelUI();
+    if(checkDuelWinCondition()) return; // I just hit the winning score — duel ends now, bot doesn't get a reply turn
+    setTimeout(()=>{
+      if(!duel.active || !duel.isBot || duel.finished) return;
+      const botMake = Math.random() < BOT_ACCURACY;
+      triggerOpponentShotAnimation(botMake);
+    }, 900+Math.random()*500);
+    return;
+  }
+
+  const room = await roomGet(duel.code);
+  if(!room) return;
+  if(duel.role==='host'){ room.hostShots = room.hostShots||[]; room.hostShots.push(isMake); room.turn='guest'; duel.myShots = room.hostShots; }
+  else { room.guestShots = room.guestShots||[]; room.guestShots.push(isMake); room.turn='host'; duel.myShots = room.guestShots; }
+  room.updatedAt = Date.now();
+  await roomSet(duel.code, room);
+  duel.turn = room.turn;
+  renderDuelUI();
+  checkDuelWinCondition(); // instant local feedback if this shot won it, rather than waiting on the next poll
+}
+
+/* init */
+renderSkinGrid();
+renderGachaPreview();
+})();
+</script>
+</body>
+</html>
